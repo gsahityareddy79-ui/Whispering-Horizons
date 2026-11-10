@@ -1,0 +1,6 @@
+{
+  "name": "Whispering Horizons",
+  "description": "An original realistic cinematic 3D coastal exploration game with third-person character movement, cliffs, lighthouse, dynamic sunset sky, and interactive lore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
