@@ -7,7 +7,7 @@ import {
   createWoodPlankMaterials,
 } from './proceduralTextures';
 
-export const ISLAND_RADIUS = 95;
+export const ISLAND_RADIUS = 96;
 
 // Main walking path coordinates winding through the island
 export const PATH_WAYPOINTS: [number, number][] = [
@@ -41,15 +41,20 @@ export function distanceToPath(x: number, z: number): number {
   return minDist;
 }
 
-// Multi-octave natural terrain height function
-function naturalNoise(x: number, z: number): number {
-  let v = 0;
-  v += Math.sin(x * 0.032 + z * 0.026) * 4.4;
-  v += Math.cos(x * 0.062 - z * 0.052) * 2.6;
-  v += Math.sin(x * 0.11 + z * 0.10) * 1.3;
-  v += Math.cos(x * 0.22 - z * 0.19) * 0.55;
-  v += Math.sin(x * 0.42 + z * 0.38) * 0.22;
-  return v;
+// Domain-warped natural geological noise (removes artificial/repetitive patterns)
+function domainWarpNoise(x: number, z: number): number {
+  const qx = Math.sin(x * 0.02 + z * 0.015) * 8.0;
+  const qz = Math.cos(x * 0.015 + z * 0.02) * 8.0;
+  const rx = Math.sin((x + qx) * 0.035) * 4.0;
+  const rz = Math.cos((z + qz) * 0.035) * 4.0;
+
+  return (
+    Math.sin((x + rx) * 0.032 + (z + rz) * 0.026) * 4.6 +
+    Math.cos((x - rx) * 0.062 - (z - rz) * 0.052) * 2.8 +
+    Math.sin(x * 0.12 + z * 0.11) * 1.4 +
+    Math.cos(x * 0.24 - z * 0.21) * 0.6 +
+    Math.sin(x * 0.45 + z * 0.4) * 0.22
+  );
 }
 
 export function getTerrainHeight(x: number, z: number): number {
@@ -61,21 +66,21 @@ export function getTerrainHeight(x: number, z: number): number {
 
   // Smooth organic coast radial falloff
   const mask = Math.max(0, 1 - Math.pow(dist / ISLAND_RADIUS, 1.85));
-  let h = naturalNoise(x, z);
+  let h = domainWarpNoise(x, z);
 
   // 1. Central/North-East Mountain Peak (Lighthouse Summit at 18, -27)
   const distSummit = Math.hypot(x - 18, z - (-27));
-  if (distSummit < 36) {
-    const s = Math.max(0, 1 - distSummit / 36);
-    h += Math.pow(s, 1.75) * 17.5;
+  if (distSummit < 38) {
+    const s = Math.max(0, 1 - distSummit / 38);
+    h += Math.pow(s, 1.7) * 18.0;
   }
 
   // 2. Rugged Western & Northern Sea Cliffs (around x < 0, z < -8)
   if (z < -8) {
     const cFactor = Math.max(0, -z / 65);
-    h += cFactor * 8.5;
-    if (dist > 50 && z < -18) {
-      const drop = Math.pow((dist - 50) / 28, 2.2) * 24;
+    h += cFactor * 8.6;
+    if (dist > 48 && z < -18) {
+      const drop = Math.pow((dist - 48) / 28, 2.2) * 24;
       h -= drop;
     }
   }
@@ -84,7 +89,7 @@ export function getTerrainHeight(x: number, z: number): number {
   const distPerch = Math.hypot(x - (-16), z - (-26));
   if (distPerch < 18) {
     const p = Math.max(0, 1 - distPerch / 18);
-    h += p * 5.6;
+    h += p * 5.8;
   }
 
   // 4. Southern Beach Bay at (0, 52)
@@ -101,7 +106,7 @@ export function getTerrainHeight(x: number, z: number): number {
     h -= g * 7.8;
   }
 
-  let finalH = (h + 4.0) * mask;
+  let finalH = (h + 4.2) * mask;
 
   // Carve smooth footpath
   const pDist = distanceToPath(x, z);
@@ -132,6 +137,7 @@ export function getTerrainNormal(x: number, z: number, out: THREE.Vector3): THRE
 export interface TerrainWorld {
   mesh: THREE.Mesh;
   trees: THREE.InstancedMesh;
+  bushes: THREE.InstancedMesh;
   rocks: THREE.InstancedMesh;
   flowers: THREE.InstancedMesh;
   grassBlades: THREE.InstancedMesh;
@@ -159,12 +165,12 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   // Vertex coloring for seamless multi-biome blending
   const colors = new Float32Array(count * 3);
   const colSand = new THREE.Color('#caa572');
-  const colWetSand = new THREE.Color('#8c6b41');
+  const colWetSand = new THREE.Color('#826038');
   const colGrass = new THREE.Color('#416d2b');
   const colGrassSun = new THREE.Color('#5f9435');
   const colMoss = new THREE.Color('#2d4c1d');
   const colRockCliff = new THREE.Color('#585551');
-  const colDarkSlate = new THREE.Color('#3c3a37');
+  const colDarkSlate = new THREE.Color('#383633');
   const colPath = new THREE.Color('#786752');
 
   const tempNorm = new THREE.Vector3();
@@ -188,14 +194,14 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
     } else if (pDist < 1.9 && slope < 0.45) {
       const pathT = 1.0 - pDist / 1.9;
       tempCol.copy(colGrass).lerp(colPath, pathT * 0.85);
-    } else if (slope > 0.44 || (y > 11 && slope > 0.34)) {
-      const cliffT = Math.min(1, (slope - 0.38) * 2.8);
+    } else if (slope > 0.42 || (y > 11 && slope > 0.32)) {
+      const cliffT = Math.min(1, (slope - 0.36) * 2.8);
       tempCol.copy(colGrass).lerp(colRockCliff, cliffT);
-      if (slope > 0.65) tempCol.lerp(colDarkSlate, 0.45);
+      if (slope > 0.62) tempCol.lerp(colDarkSlate, 0.5);
     } else {
       const altT = Math.min(1, Math.max(0, y / 18));
       tempCol.copy(colGrass).lerp(colGrassSun, altT * 0.45);
-      if (y < 4.5) tempCol.lerp(colMoss, 0.2);
+      if (y < 4.5) tempCol.lerp(colMoss, 0.22);
     }
 
     colors[i * 3] = tempCol.r;
@@ -231,14 +237,36 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   const seaStacks = createOffshoreSeaStacks();
   scene.add(seaStacks);
 
+  // Shared wind uniform for GPU vertex shader wind animation
+  const windUniform = { value: 0 };
+
   // 3. Dense Realistic Maritime Pine & Hardwood Trees
-  const treeCount = isLowQuality ? 80 : 150;
+  const treeCount = isLowQuality ? 85 : 160;
   const treeGeom = createRealisticBranchingPineGeometry();
   const treeMat = new THREE.MeshStandardMaterial({
     color: '#28461f',
-    roughness: 0.75,
-    metalness: 0.08,
+    roughness: 0.72,
+    metalness: 0.06,
   });
+
+  // Inject subtle wind sway on tree branches
+  treeMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = windUniform;
+    shader.vertexShader = `
+      uniform float uTime;
+      ${shader.vertexShader}
+    `;
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `
+      #include <begin_vertex>
+      float treeWind = sin(uTime * 1.6 + transformed.x * 0.2 + transformed.z * 0.2) * 0.12;
+      transformed.x += treeWind * smoothstep(1.5, 6.0, transformed.y);
+      transformed.z += treeWind * 0.5 * smoothstep(1.5, 6.0, transformed.y);
+      `
+    );
+  };
+
   const treesMesh = new THREE.InstancedMesh(treeGeom, treeMat, treeCount);
   treesMesh.castShadow = !isLowQuality;
   treesMesh.receiveShadow = true;
@@ -248,7 +276,7 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   let placedTrees = 0;
   let attempts = 0;
 
-  while (placedTrees < treeCount && attempts < 900) {
+  while (placedTrees < treeCount && attempts < 950) {
     attempts++;
     const angle = Math.random() * Math.PI * 2;
     const r = 12 + Math.random() * (ISLAND_RADIUS - 22);
@@ -283,7 +311,45 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   treesMesh.computeBoundingSphere();
   scene.add(treesMesh);
 
-  // 4. Realistic Sculpted Rocks & Boulders
+  // 4. Coastal Bushes and Shrubbery (Sprawling junipers hugging cliff edges)
+  const bushCount = isLowQuality ? 40 : 80;
+  const bushGeom = createBushGeometry();
+  const bushMat = new THREE.MeshStandardMaterial({
+    color: '#345828',
+    roughness: 0.8,
+    metalness: 0.05,
+  });
+  const bushesMesh = new THREE.InstancedMesh(bushGeom, bushMat, bushCount);
+  bushesMesh.castShadow = !isLowQuality;
+  bushesMesh.receiveShadow = true;
+
+  let placedBushes = 0;
+  attempts = 0;
+  while (placedBushes < bushCount && attempts < 600) {
+    attempts++;
+    const angle = Math.random() * Math.PI * 2;
+    const r = 20 + Math.random() * (ISLAND_RADIUS - 15);
+    const bx = Math.cos(angle) * r;
+    const bz = Math.sin(angle) * r;
+    const by = getTerrainHeight(bx, bz);
+    getTerrainNormal(bx, bz, tempNorm);
+
+    if (by > 1.5 && by < 17 && tempNorm.y > 0.72 && distanceToPath(bx, bz) > 1.5) {
+      const bs = 0.75 + Math.random() * 0.6;
+      dummy.position.set(bx, by - 0.1, bz);
+      dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
+      dummy.scale.set(bs * 1.3, bs * 0.8, bs * 1.3);
+      dummy.updateMatrix();
+      bushesMesh.setMatrixAt(placedBushes, dummy.matrix);
+      placedBushes++;
+    }
+  }
+  bushesMesh.count = placedBushes;
+  bushesMesh.instanceMatrix.needsUpdate = true;
+  bushesMesh.computeBoundingSphere();
+  scene.add(bushesMesh);
+
+  // 5. Realistic Sculpted Rocks & Boulders
   const rockCount = isLowQuality ? 60 : 120;
   const rockMatData = createCliffRockMaterials();
   const boulderGeom = createSculptedBoulderGeometry();
@@ -325,7 +391,7 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   rocksMesh.computeBoundingSphere();
   scene.add(rocksMesh);
 
-  // 5. Wildflower Meadows (Poppies, Lupines, Daisies)
+  // 6. Wildflower Meadows (Poppies, Lupines, Daisies) with wind sway
   const flowerCount = isLowQuality ? 110 : 260;
   const flowerGeom = new THREE.ConeGeometry(0.24, 0.52, 5);
   flowerGeom.translate(0, 0.26, 0);
@@ -333,6 +399,24 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
     roughness: 0.45,
     metalness: 0.05,
   });
+
+  flowerMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = windUniform;
+    shader.vertexShader = `
+      uniform float uTime;
+      ${shader.vertexShader}
+    `;
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `
+      #include <begin_vertex>
+      float fWind = sin(uTime * 2.2 + transformed.x * 0.4 + transformed.z * 0.4) * 0.15;
+      transformed.x += fWind * smoothstep(0.1, 0.5, transformed.y);
+      transformed.z += fWind * 0.5 * smoothstep(0.1, 0.5, transformed.y);
+      `
+    );
+  };
+
   const flowersMesh = new THREE.InstancedMesh(flowerGeom, flowerMat, flowerCount);
 
   const flowerPalette = [
@@ -371,14 +455,33 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   flowersMesh.computeBoundingSphere();
   scene.add(flowersMesh);
 
-  // 6. Grass Blade Tufts
-  const grassCount = isLowQuality ? 130 : 340;
+  // 7. Dense Volumetric Grass Blades with GPU Wind Shader
+  const grassCount = isLowQuality ? 140 : 360;
   const grassGeom = createGrassTuftGeometry();
   const grassMat = new THREE.MeshStandardMaterial({
     color: '#497c2a',
     roughness: 0.85,
     metalness: 0.02,
   });
+
+  grassMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = windUniform;
+    shader.vertexShader = `
+      uniform float uTime;
+      ${shader.vertexShader}
+    `;
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `
+      #include <begin_vertex>
+      // Natural blade bending in coastal wind
+      float gWind = sin(uTime * 2.5 + transformed.x * 0.35 + transformed.z * 0.35) * 0.22;
+      transformed.x += gWind * smoothstep(0.1, 0.75, transformed.y);
+      transformed.z += gWind * 0.6 * smoothstep(0.1, 0.75, transformed.y);
+      `
+    );
+  };
+
   const grassBlades = new THREE.InstancedMesh(grassGeom, grassMat, grassCount);
 
   let placedGrass = 0;
@@ -405,26 +508,26 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   grassBlades.computeBoundingSphere();
   scene.add(grassBlades);
 
-  // 7. Arrival Pier at Pelican Cove
+  // 8. Arrival Pier at Pelican Cove
   const dock = createArtisanPier();
   dock.position.set(0, 0.45, 56);
   scene.add(dock);
 
-  // 8. Rustic Arch Bridge across the stream
+  // 9. Rustic Arch Bridge across the stream
   const bridge = createWoodenArchBridge();
   const bY = getTerrainHeight(-12, -4);
   bridge.position.set(-12, bY + 0.2, -4);
   bridge.rotation.y = Math.PI / 3;
   scene.add(bridge);
 
-  // 9. Falcon's Perch Campfire & Sunset Bench
+  // 10. Falcon's Perch Campfire & Sunset Bench
   const { group: benchRest, fireLight, fireEmbers } = createCliffRestingLocation();
   const restY = getTerrainHeight(-16, -26);
   benchRest.position.set(-16, restY, -26);
   benchRest.rotation.y = Math.PI / 4;
   scene.add(benchRest);
 
-  // 10. Waterfall Basin Spray Particles
+  // 11. Waterfall Basin Spray Particles
   const sprayCount = 180;
   const sprayGeom = new THREE.BufferGeometry();
   const sprayPositions = new Float32Array(sprayCount * 3);
@@ -444,7 +547,7 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   const waterfallSpray = new THREE.Points(sprayGeom, sprayMat);
   scene.add(waterfallSpray);
 
-  // 11. Twilight Fireflies
+  // 12. Twilight Fireflies
   const fireflyCount = 95;
   const fireflyGeom = new THREE.BufferGeometry();
   const fireflyPositions = new Float32Array(fireflyCount * 3);
@@ -474,6 +577,7 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   return {
     mesh: terrainMesh,
     trees: treesMesh,
+    bushes: bushesMesh,
     rocks: rocksMesh,
     flowers: flowersMesh,
     grassBlades,
@@ -487,6 +591,9 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
     waterfallSpray,
     fireflies,
     update: (time: number) => {
+      // Update global GPU wind time
+      windUniform.value = time;
+
       // Fireflies floating
       const fPos = fireflyGeom.attributes.position;
       for (let i = 0; i < fireflyCount; i++) {
@@ -638,6 +745,45 @@ function createRealisticBranchingPineGeometry(): THREE.BufferGeometry {
   return merged;
 }
 
+function createBushGeometry(): THREE.BufferGeometry {
+  const g1 = new THREE.DodecahedronGeometry(1.0, 1);
+  g1.scale(1.2, 0.7, 1.1);
+  g1.translate(0, 0.5, 0);
+
+  const g2 = new THREE.DodecahedronGeometry(0.8, 1);
+  g2.scale(1.0, 0.6, 1.0);
+  g2.translate(0.4, 0.45, 0.2);
+
+  const geoms = [g1, g2];
+  let vCount = 0;
+  for (const g of geoms) vCount += g.attributes.position.count;
+
+  const mPos = new Float32Array(vCount * 3);
+  const mNorm = new Float32Array(vCount * 3);
+  let off = 0;
+
+  for (const g of geoms) {
+    const p = g.attributes.position;
+    const n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) {
+      mPos[(off + i) * 3] = p.getX(i);
+      mPos[(off + i) * 3 + 1] = p.getY(i);
+      mPos[(off + i) * 3 + 2] = p.getZ(i);
+      if (n) {
+        mNorm[(off + i) * 3] = n.getX(i);
+        mNorm[(off + i) * 3 + 1] = n.getY(i);
+        mNorm[(off + i) * 3 + 2] = n.getZ(i);
+      }
+    }
+    off += p.count;
+  }
+
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(mNorm, 3));
+  return merged;
+}
+
 function createSculptedBoulderGeometry(): THREE.BufferGeometry {
   const geom = new THREE.DodecahedronGeometry(1.5, 1);
   const p = geom.attributes.position;
@@ -652,16 +798,17 @@ function createSculptedBoulderGeometry(): THREE.BufferGeometry {
 }
 
 function createGrassTuftGeometry(): THREE.BufferGeometry {
-  const g1 = new THREE.PlaneGeometry(0.65, 0.8);
-  g1.translate(0, 0.4, 0);
+  // Curved individual grass blades
+  const g1 = new THREE.PlaneGeometry(0.7, 0.85);
+  g1.translate(0, 0.42, 0);
 
-  const g2 = new THREE.PlaneGeometry(0.65, 0.8);
+  const g2 = new THREE.PlaneGeometry(0.7, 0.85);
   g2.rotateY(Math.PI / 3);
-  g2.translate(0, 0.4, 0);
+  g2.translate(0, 0.42, 0);
 
-  const g3 = new THREE.PlaneGeometry(0.65, 0.8);
+  const g3 = new THREE.PlaneGeometry(0.7, 0.85);
   g3.rotateY((Math.PI / 3) * 2);
-  g3.translate(0, 0.4, 0);
+  g3.translate(0, 0.42, 0);
 
   const geoms = [g1, g2, g3];
   let vCount = 0;
