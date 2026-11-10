@@ -207,7 +207,7 @@ export const NoteModal: React.FC<NoteModalProps> = ({ landmark, onClose }) => {
             onClick={onClose}
             className="px-5 py-2 bg-[#4a3622] hover:bg-[#382818] text-[#f7eed9] text-xs font-semibold tracking-wider uppercase rounded-xl transition-colors cursor-pointer"
           >
-            Continue Journey
+            Return to Exploration
           </button>
         </div>
       </div>

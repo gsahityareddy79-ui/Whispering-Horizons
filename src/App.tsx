@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from './game/engine';
-import { GameSettings, GameState, GraphicsQuality, Landmark } from './game/types';
+import { GameSettings, GameState, GraphicsQuality } from './game/types';
 import { TitleScreen } from './components/TitleScreen';
 import { HUD } from './components/HUD';
 import { VirtualJoystick } from './components/VirtualJoystick';
 import { NoteModal } from './components/NoteModal';
 import { PauseMenu } from './components/PauseMenu';
-import { resetDiscoveredNotes } from './game/lore';
 import { soundEngine } from './game/audio';
 
 const defaultSettings: GameSettings = {
@@ -19,6 +18,8 @@ const defaultSettings: GameSettings = {
   timeOfDay: 17.5, // 5:30 PM Golden Sunset
   autoCycleTime: false,
   touchControls: true,
+  showCinematicBars: true,
+  zenMode: false,
 };
 
 export default function App() {
@@ -26,16 +27,20 @@ export default function App() {
   const engineRef = useRef<GameEngine | null>(null);
 
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
+  const [cinematicLetterbox, setCinematicLetterbox] = useState(true);
+  const [zenMode, setZenMode] = useState(false);
+
   const [gameState, setGameState] = useState<GameState>({
     playing: false,
     paused: false,
+    isSitting: false,
     timeOfDay: 17.5,
     currentLocationName: 'Pelican Cove Pier',
     activeLandmark: null,
     readingNote: null,
-    discoveredLandmarkIds: [],
-    totalLandmarks: 5,
     fps: 60,
+    zenMode: false,
+    cinematicLetterbox: true,
   });
 
   const [isMuted, setIsMuted] = useState(false);
@@ -46,6 +51,20 @@ export default function App() {
   useEffect(() => {
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     setIsMobileTouch(isTouch);
+  }, []);
+
+  // Keyboard shortcuts: 'KeyC' for Letterbox, 'KeyH' for Zen Mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+      if (e.code === 'KeyC') {
+        setCinematicLetterbox((prev) => !prev);
+      } else if (e.code === 'KeyH') {
+        setZenMode((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Initialize Three.js Engine once on mount
@@ -68,7 +87,7 @@ export default function App() {
     };
   }, []);
 
-  // Presence heartbeat for the online backend
+  // Online Presence Heartbeat
   useEffect(() => {
     const playerId = `wanderer-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -149,15 +168,6 @@ export default function App() {
     setSettings((s) => ({ ...s, musicMuted: nextMuted }));
   }, [isMuted]);
 
-  const handleResetProgress = useCallback(() => {
-    resetDiscoveredNotes();
-    setGameState((prev) => ({ ...prev, discoveredLandmarkIds: [] }));
-    if (engineRef.current) {
-      engineRef.current.resumeGame();
-    }
-  }, []);
-
-  // Virtual Joystick callbacks
   const handleJoystickMove = useCallback((x: number, y: number) => {
     if (engineRef.current) {
       engineRef.current.setJoystickInput(x, y);
@@ -185,23 +195,22 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none">
-      {/* 1. Stable WebGL Canvas Container outside React HUD (Three.js skill directive) */}
+      {/* 1. Stable WebGL Canvas Container */}
       <div
         ref={canvasMountRef}
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
       />
 
-      {/* 2. Title Screen State */}
+      {/* 2. Title Screen */}
       {!gameState.playing && (
         <TitleScreen
           onStart={handleStartGame}
           quality={settings.quality}
           onQualityChange={handleQualityChange}
-          savedSecretsCount={gameState.discoveredLandmarkIds.length}
         />
       )}
 
-      {/* 3. In-Game HUD Overlay (Low Occlusion) */}
+      {/* 3. In-Game HUD & Letterbox */}
       {gameState.playing && !gameState.paused && (
         <>
           <HUD
@@ -216,9 +225,13 @@ export default function App() {
             quality={settings.quality}
             onQualityChange={handleQualityChange}
             isMobileTouch={isMobileTouch}
+            cinematicLetterbox={cinematicLetterbox}
+            onToggleCinematicLetterbox={() => setCinematicLetterbox((prev) => !prev)}
+            zenMode={zenMode}
+            onToggleZenMode={() => setZenMode((prev) => !prev)}
           />
 
-          {/* Virtual Joystick for Touch / Mobile */}
+          {/* Virtual Joystick for Touch / Mobile (hidden in zenMode if desired or semi-transparent) */}
           {isMobileTouch && (
             <VirtualJoystick
               onJoystickMove={handleJoystickMove}
@@ -242,7 +255,6 @@ export default function App() {
           onResume={handleResumeGame}
           quality={settings.quality}
           onQualityChange={handleQualityChange}
-          onResetProgress={handleResetProgress}
         />
       )}
     </div>

@@ -27,6 +27,7 @@ class SoundEngine {
       this.initOceanSurf();
       this.initCoastalWind();
       this.initWaterfall();
+      this.initCampfire();
 
       this.isInitialized = true;
     } catch (e) {
@@ -168,16 +169,61 @@ class SoundEngine {
     noise.start();
   }
 
+  private campfireGain: GainNode | null = null;
+
+  // 4. Procedural Crackling Campfire Ambience
+  private initCampfire() {
+    if (!this.ctx || !this.masterGain) return;
+
+    const bufferSize = this.ctx.sampleRate * 2;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      // Crackle pops
+      const isPop = Math.random() < 0.003;
+      data[i] = isPop ? (Math.random() - 0.5) * 0.8 : (Math.random() - 0.5) * 0.04;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    noise.loop = true;
+
+    const bandpass = this.ctx.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    bandpass.frequency.value = 1200;
+    bandpass.Q.value = 1.8;
+
+    this.campfireGain = this.ctx.createGain();
+    this.campfireGain.gain.value = 0.0;
+
+    noise.connect(bandpass);
+    bandpass.connect(this.campfireGain);
+    this.campfireGain.connect(this.masterGain);
+
+    noise.start();
+  }
+
   /**
-   * Update dynamic spatial waterfall sound based on player distance to falls at (45, 10)
+   * Update spatial audio (waterfall at 42, 11 and campfire at -16, -26)
    */
   public updatePlayerPosition(px: number, pz: number) {
-    if (!this.waterfallGain || !this.ctx) return;
-    const dist = Math.hypot(px - 45, pz - 10);
-    const maxDist = 50;
-    const vol = Math.max(0, 1 - dist / maxDist);
-    // Smooth quadratic curve
-    this.waterfallGain.gain.setTargetAtTime(vol * vol * 0.55, this.ctx.currentTime, 0.1);
+    if (!this.ctx) return;
+
+    // Waterfall spatial volume
+    if (this.waterfallGain) {
+      const distW = Math.hypot(px - 42, pz - 11);
+      const maxDistW = 55;
+      const volW = Math.max(0, 1 - distW / maxDistW);
+      this.waterfallGain.gain.setTargetAtTime(volW * volW * 0.55, this.ctx.currentTime, 0.1);
+    }
+
+    // Campfire spatial volume
+    if (this.campfireGain) {
+      const distC = Math.hypot(px - (-16), pz - (-26));
+      const maxDistC = 22;
+      const volC = Math.max(0, 1 - distC / maxDistC);
+      this.campfireGain.gain.setTargetAtTime(volC * volC * 0.35, this.ctx.currentTime, 0.1);
+    }
   }
 
   /**

@@ -9,12 +9,11 @@ import {
   LighthouseStructure,
   createAncientShrine,
   ShrineObject,
-  createSunsetPerch,
   createLorePedestal,
   LorePedestal,
 } from './models';
 import { GameSettings, GameState, Landmark, PlayerInput } from './types';
-import { ISLAND_LANDMARKS, loadDiscoveredNotes, saveDiscoveredNotes } from './lore';
+import { ISLAND_LANDMARKS } from './lore';
 import { soundEngine } from './audio';
 
 export class GameEngine {
@@ -28,22 +27,19 @@ export class GameEngine {
   private sky: SkyEnvironment;
   private lighthouse: LighthouseStructure;
   private shrine: ShrineObject;
-  private sunsetPerch: THREE.Group;
   private lorePedestals: LorePedestal[] = [];
 
   private isSoftwareGl = false;
   private animationFrameId = 0;
-  private lastTime = 0;
   private clock = new THREE.Clock();
 
   // State
   private isRunning = false;
   private isTitleScreen = true;
   private isPaused = false;
-  private timeOfDay = 17.5; // Start at cinematic sunset (5:30 PM)
+  private timeOfDay = 17.5; // Start at golden sunset (5:30 PM)
   private autoCycle = false;
   private settings: GameSettings;
-  private discoveredNoteIds: Set<string>;
   private landmarks: Landmark[];
   private activeLandmark: Landmark | null = null;
   private readingLandmark: Landmark | null = null;
@@ -62,6 +58,7 @@ export class GameEngine {
     run: false,
     jump: false,
     interact: false,
+    sit: false,
     joystickX: 0,
     joystickY: 0,
     cameraDeltaX: 0,
@@ -83,7 +80,6 @@ export class GameEngine {
     this.settings = settings;
     this.onStateUpdate = onStateUpdate;
     this.landmarks = JSON.parse(JSON.stringify(ISLAND_LANDMARKS));
-    this.discoveredNoteIds = new Set(loadDiscoveredNotes());
 
     // 1. Detect Software WebGL (Three.js skill directive)
     this.isSoftwareGl = (() => {
@@ -96,7 +92,7 @@ export class GameEngine {
       return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
     })();
 
-    // 2. Initialize Three.js WebGLRenderer
+    // 2. Initialize WebGLRenderer with ACESFilmic Tone Mapping
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
 
@@ -112,39 +108,32 @@ export class GameEngine {
 
     this.container.appendChild(this.renderer.domElement);
 
-    // 3. Initialize Scene, Camera & Lighting
+    // 3. Scene & Camera Setup
     this.scene = new THREE.Scene();
-    this.cameraController = new ThirdPersonCamera(60, width / height);
+    this.cameraController = new ThirdPersonCamera(58, width / height);
 
     this.sky = setupSkyAndLighting(this.scene, this.renderer, this.isSoftwareGl);
     this.sky.updateTimeOfDay(this.timeOfDay);
 
-    // 4. Construct the Island World
+    // 4. Island Terrain & Ocean World
     const isLowQ = this.settings.quality === 'low' || this.isSoftwareGl;
     this.terrain = createTerrainWorld(this.scene, isLowQ);
     this.ocean = createOceanWorld(this.scene, isLowQ);
 
-    // 5. Add Landmarks & Props
-    // Lighthouse at (18, -30)
+    // 5. Landmarks & Props
+    // Lighthouse at (18, -28)
     this.lighthouse = createLighthouse();
-    const lhY = getTerrainHeight(18, -30);
-    this.lighthouse.group.position.set(18, lhY, -30);
+    const lhY = getTerrainHeight(18, -28);
+    this.lighthouse.group.position.set(18, lhY, -28);
     this.scene.add(this.lighthouse.group);
 
-    // Ancient Shrine at (-18, 8)
+    // Ancient Whisper Shrine at (-22, 12)
     this.shrine = createAncientShrine();
-    const shrineY = getTerrainHeight(-18, 8);
-    this.shrine.group.position.set(-18, shrineY, 8);
+    const shrineY = getTerrainHeight(-22, 12);
+    this.shrine.group.position.set(-22, shrineY, 12);
     this.scene.add(this.shrine.group);
 
-    // Sunset Lookout Perch at (-15, -25)
-    this.sunsetPerch = createSunsetPerch();
-    const perchY = getTerrainHeight(-15, -25);
-    this.sunsetPerch.position.set(-15, perchY, -25);
-    this.sunsetPerch.rotation.y = Math.PI / 4;
-    this.scene.add(this.sunsetPerch);
-
-    // Interactive Lore Discovery Pedestals
+    // Lore Discovery Pedestals
     for (const lm of this.landmarks) {
       const ped = createLorePedestal(lm.id);
       const py = getTerrainHeight(lm.x, lm.z);
@@ -187,9 +176,8 @@ export class GameEngine {
   public setTimeOfDay(hour: number) {
     this.timeOfDay = ((hour % 24) + 24) % 24;
     this.sky.updateTimeOfDay(this.timeOfDay);
-    // Lantern brightness increases as dusk/night arrives
     const isDark = this.timeOfDay < 6.5 || this.timeOfDay > 18.5;
-    this.player.character.lanternLight.intensity = isDark ? 2.5 : 0.4;
+    this.player.character.lanternLight.intensity = isDark ? 2.6 : 0.4;
     this.notifyState();
   }
 
@@ -219,11 +207,7 @@ export class GameEngine {
 
   public openNote(landmark: Landmark) {
     this.readingLandmark = landmark;
-    if (!this.discoveredNoteIds.has(landmark.id)) {
-      this.discoveredNoteIds.add(landmark.id);
-      saveDiscoveredNotes(Array.from(this.discoveredNoteIds));
-      soundEngine.playDiscoveryChime();
-    }
+    soundEngine.playDiscoveryChime();
     this.notifyState();
   }
 
@@ -233,12 +217,24 @@ export class GameEngine {
   }
 
   public triggerInteract() {
-    if (this.activeLandmark) {
+    if (!this.activeLandmark) return;
+
+    if (this.activeLandmark.actionType === 'sit') {
+      if (this.player.isSitting) {
+        this.player.standUp();
+      } else {
+        // Sit on bench facing sunset
+        const benchPos = new THREE.Vector3(-16, getTerrainHeight(-16, -26) + 0.15, -26);
+        this.player.sitAt(benchPos, -Math.PI / 4);
+        this.openNote(this.activeLandmark);
+      }
+    } else {
       this.openNote(this.activeLandmark);
     }
+    this.notifyState();
   }
 
-  // Mobile virtual joystick input bridge
+  // Mobile virtual joystick input
   public setJoystickInput(x: number, y: number) {
     this.input.joystickX = x;
     this.input.joystickY = y;
@@ -271,7 +267,6 @@ export class GameEngine {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    // If typing in an input field (e.g. leaving note message), ignore game movement
     if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
     switch (e.code) {
@@ -388,7 +383,6 @@ export class GameEngine {
   private startLoop() {
     this.isRunning = true;
     this.clock.start();
-    this.lastTime = performance.now();
     this.lastFpsCalc = performance.now();
 
     const tick = () => {
@@ -396,10 +390,8 @@ export class GameEngine {
 
       const now = performance.now();
       const rawDt = this.clock.getDelta();
-      // Clamp delta time to avoid physics tunneling on lag spikes
       const delta = Math.min(rawDt, 0.05);
 
-      // FPS counter calculation
       this.frameCount++;
       if (now - this.lastFpsCalc >= 1000) {
         this.currentFps = Math.round((this.frameCount * 1000) / (now - this.lastFpsCalc));
@@ -424,7 +416,6 @@ export class GameEngine {
     }
   }
 
-  // Paced loop helper for software WebGL (Three.js skill directive)
   private afterDraw(cb: () => void) {
     const gl = this.renderer.getContext() as WebGL2RenderingContext;
     const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -442,30 +433,40 @@ export class GameEngine {
   }
 
   private update(delta: number, elapsed: number) {
-    // 1. Auto cycle day/night if enabled
     if (this.autoCycle && !this.isPaused) {
       this.timeOfDay = (this.timeOfDay + delta * 0.15) % 24;
       this.sky.updateTimeOfDay(this.timeOfDay);
     }
 
-    // 2. Animate world props (ocean waves, lighthouse beacon, floating crystal)
+    // World animation updates
     this.ocean.update(elapsed);
     this.lighthouse.update(delta);
     this.shrine.update(elapsed);
+    this.sky.updateClouds(delta);
+    this.terrain.update(elapsed);
+
     for (const ped of this.lorePedestals) {
       ped.update(elapsed);
     }
 
-    // 3. Camera & Player logic based on mode
     if (this.isTitleScreen) {
       this.cameraController.updateCinematic(elapsed);
     } else if (!this.isPaused && !this.readingLandmark) {
       this.player.update(delta, this.input, this.cameraController.camera);
-      this.cameraController.update(delta, this.player.position);
+      this.cameraController.update(
+        delta,
+        this.player.position,
+        this.player.moveSpeed > 5.0,
+        this.player.isSitting
+      );
       this.checkLandmarksProximity();
     } else {
-      // While paused or reading note, still keep camera following gently
-      this.cameraController.update(delta, this.player.position);
+      this.cameraController.update(
+        delta,
+        this.player.position,
+        false,
+        this.player.isSitting
+      );
     }
   }
 
@@ -493,11 +494,11 @@ export class GameEngine {
     const px = this.player.position.x;
     const pz = this.player.position.z;
 
-    if (Math.hypot(px - 18, pz - (-30)) < 22) return 'Lighthouse Summit';
-    if (Math.hypot(px - (-15), pz - (-25)) < 18) return "Falcon's Sunset Perch";
-    if (Math.hypot(px - 45, pz - 10) < 22) return 'Emerald Cascade Falls';
-    if (Math.hypot(px - (-18), pz - 8) < 18) return 'The Whisper Shrine';
-    if (Math.hypot(px - 0, pz - 50) < 20) return 'Pelican Cove Pier';
+    if (Math.hypot(px - 18, pz - (-27)) < 24) return 'Lighthouse Summit';
+    if (Math.hypot(px - (-16), pz - (-26)) < 18) return "Falcon's Sunset Perch";
+    if (Math.hypot(px - 42, pz - 11) < 22) return 'Emerald Cascade Falls';
+    if (Math.hypot(px - (-22), pz - 12) < 18) return 'The Whisper Shrine';
+    if (Math.hypot(px - 0, pz - 50) < 22) return 'Pelican Cove Pier';
     if (pz < -15) return 'North Sea Cliffs';
     return 'Lush Coastal Ridge';
   }
@@ -507,13 +508,14 @@ export class GameEngine {
     this.onStateUpdate({
       playing: !this.isTitleScreen,
       paused: this.isPaused,
+      isSitting: this.player.isSitting,
       timeOfDay: this.timeOfDay,
       currentLocationName: this.getCurrentLocationName(),
       activeLandmark: this.activeLandmark,
       readingNote: this.readingLandmark,
-      discoveredLandmarkIds: Array.from(this.discoveredNoteIds),
-      totalLandmarks: this.landmarks.length,
       fps: this.currentFps,
+      zenMode: this.settings.zenMode,
+      cinematicLetterbox: this.settings.showCinematicBars,
     });
   }
 

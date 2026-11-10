@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Play,
-  RotateCcw,
-  Sliders,
   Volume2,
-  ShieldCheck,
   Smartphone,
   Monitor,
   X,
   Radio,
+  Eye,
+  Film,
 } from 'lucide-react';
 import { GraphicsQuality } from '../game/types';
 import { soundEngine } from '../game/audio';
@@ -17,21 +16,18 @@ interface PauseMenuProps {
   onResume: () => void;
   quality: GraphicsQuality;
   onQualityChange: (q: GraphicsQuality) => void;
-  onResetProgress: () => void;
 }
 
 export const PauseMenu: React.FC<PauseMenuProps> = ({
   onResume,
   quality,
   onQualityChange,
-  onResetProgress,
 }) => {
   const [volume, setVolume] = useState(80);
   const [serverStatus, setServerStatus] = useState<string>('Checking...');
   const [activeTab, setActiveTab] = useState<'settings' | 'controls' | 'online'>('settings');
 
   useEffect(() => {
-    // Check server backend health
     fetch('/api/health')
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {
@@ -59,7 +55,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
             >
               PAUSED
             </div>
-            <div className="text-xs text-[#8ca4b8]">Whispering Horizons</div>
+            <div className="text-xs text-[#8ca4b8]">Whispering Horizons · Peaceful Coastal Walk</div>
           </div>
 
           <button
@@ -153,19 +149,10 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
                 />
               </div>
 
-              {/* Reset Progress */}
-              <div className="pt-2 border-t border-[#1c2c3e]">
-                <button
-                  onClick={() => {
-                    if (confirm('Reset your discovered notes and exploration progress?')) {
-                      onResetProgress();
-                    }
-                  }}
-                  className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset Saved Exploration Progress</span>
-                </button>
+              {/* Peaceful Meditation Note */}
+              <div className="p-3 bg-[#121a24] rounded-2xl border border-[#1e2c3c] text-[11px] text-[#8ca4b8] leading-relaxed">
+                Take your time to explore at your own pace. There are no timers, no health bars, and no
+                quests. Enjoy the peaceful sound of the waves and the beauty of the island.
               </div>
             </div>
           )}
@@ -181,9 +168,11 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
                   <div><strong className="text-white">WASD / Arrows:</strong> Walk</div>
                   <div><strong className="text-white">Left Shift:</strong> Run / Sprint</div>
                   <div><strong className="text-white">Spacebar:</strong> Jump</div>
-                  <div><strong className="text-white">Mouse Drag:</strong> Orbit Camera</div>
-                  <div><strong className="text-white">Mouse Wheel:</strong> Zoom In / Out</div>
-                  <div><strong className="text-white">E Key:</strong> Read Note / Inspect</div>
+                  <div><strong className="text-white">Mouse Drag:</strong> Look Around</div>
+                  <div><strong className="text-white">Mouse Wheel:</strong> Zoom Camera</div>
+                  <div><strong className="text-white">E Key:</strong> Rest / Read Note</div>
+                  <div><strong className="text-white">C Key:</strong> Cinema Letterbox</div>
+                  <div><strong className="text-white">H Key:</strong> Zen Mode (Hide HUD)</div>
                 </div>
               </div>
 
@@ -197,7 +186,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
                   <div><strong className="text-white">Right Half Touch:</strong> Orbit Camera</div>
                   <div><strong className="text-white">Arrow Up Icon:</strong> Jump</div>
                   <div><strong className="text-white">Zap Icon:</strong> Toggle Sprint</div>
-                  <div><strong className="text-white">TAP Button:</strong> Read Note</div>
+                  <div><strong className="text-white">TAP Button:</strong> Rest / Read Note</div>
                 </div>
               </div>
             </div>
@@ -219,9 +208,9 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
                   Status: <span className="text-white font-mono">{serverStatus}</span>
                 </p>
                 <p className="text-[11px] text-[#8ca4b8] leading-relaxed">
-                  The backend enables shared community drift bottle notes and tracks live explorer
-                  heartbeats. In future releases, real-time WebSocket synchronization will allow seeing other
-                  explorers moving across the island in real time!
+                  The backend enables shared drift bottle messages across the island shore.
+                  In future phases, synchronized multiplayer character presence will allow you to see
+                  other wanderers walking peacefully along the coast!
                 </p>
               </div>
             </div>
@@ -236,7 +225,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
             className="flex items-center gap-2 px-6 py-2.5 bg-[#e5a855] hover:bg-[#f3be73] active:scale-95 text-black font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg"
           >
             <Play className="w-3.5 h-3.5 fill-black" />
-            <span>Resume Game</span>
+            <span>Resume Walking</span>
           </button>
         </div>
       </div>

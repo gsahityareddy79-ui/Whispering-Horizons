@@ -1,33 +1,29 @@
 import * as THREE from 'three';
 import {
-  createGrassTexture,
-  createRockTexture,
-  createSandTexture,
+  createGrassMaterials,
+  createCliffRockMaterials,
+  createCobblestoneMaterials,
+  createWetSandMaterials,
+  createWoodPlankMaterials,
 } from './proceduralTextures';
 
-/**
- * Procedural Island Geography & Heightmap
- * Compact coastal island with cliffs, green hills, lighthouse summit,
- * beach bay, waterfall ravine, and winding paths.
- */
+export const ISLAND_RADIUS = 95;
 
-export const ISLAND_RADIUS = 85;
-
-// Main path waypoints for distance calculation and path flattening
-const PATH_WAYPOINTS: [number, number][] = [
-  [0, 52],      // 1. Arrival Dock
-  [-8, 40],     // 2. Coastal Bay entry
-  [-12, 25],    // 3. Flower Meadow junction
-  [-18, 8],     // 4. Ancient Shrine glade
-  [-5, -5],     // 5. Central Ridge fork
-  [12, -18],    // 6. Lighthouse lower switchback
-  [18, -30],    // 7. Lighthouse summit platform
-  [-15, -25],   // 8. Western Sunset lookout branch
-  [30, 2],      // 9. East waterfall trail branch
-  [45, 10],     // 10. Waterfall overlook
+// Main walking path coordinates winding through the island
+export const PATH_WAYPOINTS: [number, number][] = [
+  [0, 56],      // Pelican Cove Pier & Beach
+  [-6, 44],     // Sandy cove trail entrance
+  [-14, 30],    // Wildflower meadow junction
+  [-22, 12],    // Ancient Whisper Shrine
+  [-12, -4],    // Valley Creek Crossing & Rustic Bridge
+  [6, -14],     // Lower Lighthouse switchback
+  [18, -27],    // Lighthouse Summit Plateau
+  [-16, -26],   // Falcon's Perch Sunset Lookout
+  [28, 4],      // Waterfall gorge path
+  [42, 11],     // Emerald Cascade overlook
 ];
 
-function distanceToPath(x: number, z: number): number {
+export function distanceToPath(x: number, z: number): number {
   let minDist = 999;
   for (let i = 0; i < PATH_WAYPOINTS.length - 1; i++) {
     const [x1, z1] = PATH_WAYPOINTS[i];
@@ -45,90 +41,92 @@ function distanceToPath(x: number, z: number): number {
   return minDist;
 }
 
-// Pseudo-noise function for procedural hills and ridges without heavy external libraries
-function pseudoNoise(x: number, z: number): number {
-  return (
-    Math.sin(x * 0.04 + z * 0.03) * 3.5 +
-    Math.cos(x * 0.08 - z * 0.06) * 2.0 +
-    Math.sin(x * 0.15 + z * 0.12) * 0.8 +
-    Math.cos(x * 0.3 - z * 0.25) * 0.3
-  );
+// Multi-octave natural terrain height function
+function naturalNoise(x: number, z: number): number {
+  let v = 0;
+  v += Math.sin(x * 0.032 + z * 0.026) * 4.4;
+  v += Math.cos(x * 0.062 - z * 0.052) * 2.6;
+  v += Math.sin(x * 0.11 + z * 0.10) * 1.3;
+  v += Math.cos(x * 0.22 - z * 0.19) * 0.55;
+  v += Math.sin(x * 0.42 + z * 0.38) * 0.22;
+  return v;
 }
 
-/**
- * Analytical height function of the island terrain
- */
 export function getTerrainHeight(x: number, z: number): number {
-  const distFromCenter = Math.hypot(x, z);
+  const dist = Math.hypot(x, z);
 
-  // Deep ocean falloff beyond island perimeter
-  if (distFromCenter > ISLAND_RADIUS + 25) {
-    return -12;
+  if (dist > ISLAND_RADIUS + 35) {
+    return -16;
   }
 
-  // Base radial island shape: high in center/north, sloping to south beach
-  const radialFactor = Math.max(0, 1 - Math.pow(distFromCenter / ISLAND_RADIUS, 1.8));
+  // Smooth organic coast radial falloff
+  const mask = Math.max(0, 1 - Math.pow(dist / ISLAND_RADIUS, 1.85));
+  let h = naturalNoise(x, z);
 
-  // Organic hill noise
-  let h = pseudoNoise(x, z);
+  // 1. Central/North-East Mountain Peak (Lighthouse Summit at 18, -27)
+  const distSummit = Math.hypot(x - 18, z - (-27));
+  if (distSummit < 36) {
+    const s = Math.max(0, 1 - distSummit / 36);
+    h += Math.pow(s, 1.75) * 17.5;
+  }
 
-  // 1. Lighthouse Summit Peak (North-East ridge) around (18, -30)
-  const distToSummit = Math.hypot(x - 18, z - (-30));
-  const summitHump = Math.max(0, 1 - distToSummit / 26);
-  h += summitHump * summitHump * 13;
-
-  // 2. North & North-West rugged Sea Cliffs around (x < 5, z < -10)
-  if (z < -10) {
-    const cliffFactor = Math.max(0, -z / 60);
-    h += cliffFactor * 6.5;
-    // Sheer dropoff cliff edge near perimeter
-    if (distFromCenter > 55 && z < -20) {
-      const drop = Math.pow((distFromCenter - 55) / 25, 2) * 16;
+  // 2. Rugged Western & Northern Sea Cliffs (around x < 0, z < -8)
+  if (z < -8) {
+    const cFactor = Math.max(0, -z / 65);
+    h += cFactor * 8.5;
+    if (dist > 50 && z < -18) {
+      const drop = Math.pow((dist - 50) / 28, 2.2) * 24;
       h -= drop;
     }
   }
 
-  // 3. South-East Coastal Bay & Sandy Beach around (0, 50)
-  const distToBeach = Math.hypot(x - 0, z - 50);
-  if (distToBeach < 35) {
-    const beachFade = Math.max(0, 1 - distToBeach / 35);
-    h = h * (1 - beachFade * 0.85) + beachFade * 0.5;
+  // 3. Falcon's Perch Scenic Bluff at (-16, -26)
+  const distPerch = Math.hypot(x - (-16), z - (-26));
+  if (distPerch < 18) {
+    const p = Math.max(0, 1 - distPerch / 18);
+    h += p * 5.6;
   }
 
-  // 4. Waterfall Ravine on East side around (45, 10)
-  const distToWaterfall = Math.hypot(x - 45, z - 10);
-  if (distToWaterfall < 20) {
-    const gorgeFade = Math.max(0, 1 - distToWaterfall / 20);
-    h -= gorgeFade * 5;
+  // 4. Southern Beach Bay at (0, 52)
+  const distBeach = Math.hypot(x - 0, z - 52);
+  if (distBeach < 38) {
+    const b = Math.max(0, 1 - distBeach / 38);
+    h = h * (1 - b * 0.88) + b * 0.45;
   }
 
-  // Scale overall by island perimeter radial mask
-  let finalHeight = (h + 3.0) * radialFactor;
+  // 5. Eastern Waterfall Gorge at (42, 11)
+  const distGorge = Math.hypot(x - 42, z - 11);
+  if (distGorge < 24) {
+    const g = Math.max(0, 1 - distGorge / 24);
+    h -= g * 7.8;
+  }
 
-  // Smooth trail carving: lower terrain slightly where paths wind
+  let finalH = (h + 4.0) * mask;
+
+  // Carve smooth footpath
   const pDist = distanceToPath(x, z);
-  if (pDist < 2.5 && finalHeight > 0.6) {
-    const pathFlatten = Math.max(0, 1 - pDist / 2.5);
-    finalHeight -= pathFlatten * 0.35;
+  if (pDist < 2.5 && finalH > 0.5) {
+    const indent = Math.max(0, 1 - pDist / 2.5);
+    finalH -= indent * 0.28;
   }
 
-  // Shoreline clamp: near water edge
-  if (distFromCenter > ISLAND_RADIUS - 6) {
-    const edgeT = (distFromCenter - (ISLAND_RADIUS - 6)) / 6;
-    finalHeight = THREE.MathUtils.lerp(finalHeight, -2.5, Math.min(1, edgeT));
+  // Shore water blending
+  if (dist > ISLAND_RADIUS - 8) {
+    const t = (dist - (ISLAND_RADIUS - 8)) / 8;
+    finalH = THREE.MathUtils.lerp(finalH, -3.5, Math.min(1, t));
   }
 
-  return finalHeight;
+  return finalH;
 }
 
-export function getTerrainNormal(x: number, z: number, outNormal: THREE.Vector3): THREE.Vector3 {
-  const eps = 0.5;
+export function getTerrainNormal(x: number, z: number, out: THREE.Vector3): THREE.Vector3 {
+  const eps = 0.4;
   const hL = getTerrainHeight(x - eps, z);
   const hR = getTerrainHeight(x + eps, z);
   const hD = getTerrainHeight(x, z - eps);
   const hU = getTerrainHeight(x, z + eps);
-  outNormal.set((hL - hR) / (2 * eps), 1.0, (hD - hU) / (2 * eps)).normalize();
-  return outNormal;
+  out.set((hL - hR) / (2 * eps), 1.0, (hD - hU) / (2 * eps)).normalize();
+  return out;
 }
 
 export interface TerrainWorld {
@@ -136,96 +134,113 @@ export interface TerrainWorld {
   trees: THREE.InstancedMesh;
   rocks: THREE.InstancedMesh;
   flowers: THREE.InstancedMesh;
-  grassTufts: THREE.InstancedMesh;
+  grassBlades: THREE.InstancedMesh;
+  seaStacks: THREE.Group;
+  distantMountains: THREE.Group;
   dock: THREE.Group;
+  bridge: THREE.Group;
+  benchRest: THREE.Group;
+  fireEmbers: THREE.Points;
+  fireLight: THREE.PointLight;
   waterfallSpray: THREE.Points;
+  fireflies: THREE.Points;
+  update: (time: number) => void;
 }
 
 export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = false): TerrainWorld {
-  const size = 220;
-  const segments = isLowQuality ? 100 : 150;
+  const size = 280;
+  const segments = isLowQuality ? 130 : 200;
   const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
   geometry.rotateX(-Math.PI / 2);
 
-  const posAttr = geometry.attributes.position;
-  const count = posAttr.count;
+  const pos = geometry.attributes.position;
+  const count = pos.count;
 
-  // Prepare vertex colors for blending: sand, grass, rock cliffs, and stone path
+  // Vertex coloring for seamless multi-biome blending
   const colors = new Float32Array(count * 3);
-  const colorSand = new THREE.Color('#d2b27b');
-  const colorGrass = new THREE.Color('#3f7329');
-  const colorGrassHighlight = new THREE.Color('#589437');
-  const colorCliff = new THREE.Color('#585754');
-  const colorPath = new THREE.Color('#8a755d');
-  const tempNormal = new THREE.Vector3();
-  const tempColor = new THREE.Color();
+  const colSand = new THREE.Color('#caa572');
+  const colWetSand = new THREE.Color('#8c6b41');
+  const colGrass = new THREE.Color('#416d2b');
+  const colGrassSun = new THREE.Color('#5f9435');
+  const colMoss = new THREE.Color('#2d4c1d');
+  const colRockCliff = new THREE.Color('#585551');
+  const colDarkSlate = new THREE.Color('#3c3a37');
+  const colPath = new THREE.Color('#786752');
+
+  const tempNorm = new THREE.Vector3();
+  const tempCol = new THREE.Color();
 
   for (let i = 0; i < count; i++) {
-    const x = posAttr.getX(i);
-    const z = posAttr.getZ(i);
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
     const y = getTerrainHeight(x, z);
-    posAttr.setY(i, y);
+    pos.setY(i, y);
 
-    getTerrainNormal(x, z, tempNormal);
-    const slope = 1.0 - tempNormal.y; // 0 = flat, 1 = vertical cliff
-
+    getTerrainNormal(x, z, tempNorm);
+    const slope = 1.0 - tempNorm.y;
     const pDist = distanceToPath(x, z);
 
-    if (y < 1.4) {
-      // Shoreline sand
-      const sandMix = Math.max(0, Math.min(1, (1.4 - y) / 1.4));
-      tempColor.copy(colorGrass).lerp(colorSand, sandMix);
-    } else if (pDist < 1.8 && slope < 0.45) {
-      // Stone trail
-      const pathFade = 1.0 - pDist / 1.8;
-      tempColor.copy(colorGrass).lerp(colorPath, pathFade * 0.85);
-    } else if (slope > 0.48 || (y > 12 && slope > 0.35)) {
-      // Steep rock cliff
-      const cliffMix = Math.min(1, (slope - 0.4) * 2.5);
-      tempColor.copy(colorGrass).lerp(colorCliff, cliffMix);
+    if (y < 0.6) {
+      tempCol.copy(colWetSand);
+    } else if (y < 1.8) {
+      const sandT = (y - 0.6) / 1.2;
+      tempCol.copy(colWetSand).lerp(colSand, sandT);
+    } else if (pDist < 1.9 && slope < 0.45) {
+      const pathT = 1.0 - pDist / 1.9;
+      tempCol.copy(colGrass).lerp(colPath, pathT * 0.85);
+    } else if (slope > 0.44 || (y > 11 && slope > 0.34)) {
+      const cliffT = Math.min(1, (slope - 0.38) * 2.8);
+      tempCol.copy(colGrass).lerp(colRockCliff, cliffT);
+      if (slope > 0.65) tempCol.lerp(colDarkSlate, 0.45);
     } else {
-      // Rich rolling grass with subtle height tint
-      const heightTint = Math.min(1, Math.max(0, y / 16));
-      tempColor.copy(colorGrass).lerp(colorGrassHighlight, heightTint * 0.4);
+      const altT = Math.min(1, Math.max(0, y / 18));
+      tempCol.copy(colGrass).lerp(colGrassSun, altT * 0.45);
+      if (y < 4.5) tempCol.lerp(colMoss, 0.2);
     }
 
-    colors[i * 3] = tempColor.r;
-    colors[i * 3 + 1] = tempColor.g;
-    colors[i * 3 + 2] = tempColor.b;
+    colors[i * 3] = tempCol.r;
+    colors[i * 3 + 1] = tempCol.g;
+    colors[i * 3 + 2] = tempCol.b;
   }
 
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
 
-  // Terrain material using procedural grass texture and vertex coloring
-  const grassTex = createGrassTexture();
-  const rockTex = createRockTexture();
+  const grassData = createGrassMaterials();
 
-  const terrainMat = new THREE.MeshStandardMaterial({
-    map: grassTex,
-    bumpMap: rockTex,
-    bumpScale: 0.12,
+  const terrainMaterial = new THREE.MeshStandardMaterial({
+    map: grassData.map,
+    normalMap: grassData.normalMap,
+    normalScale: new THREE.Vector2(0.85, 0.85),
+    roughnessMap: grassData.roughnessMap,
     roughness: 0.85,
-    metalness: 0.05,
+    metalness: 0.04,
     vertexColors: true,
   });
 
-  const terrainMesh = new THREE.Mesh(geometry, terrainMat);
+  const terrainMesh = new THREE.Mesh(geometry, terrainMaterial);
   terrainMesh.receiveShadow = true;
   terrainMesh.castShadow = false;
   scene.add(terrainMesh);
 
-  // 1. Instanced Pine Trees (Composite design: trunk + 3 cone layers)
-  // We combine the pine tree into a single merged geometry for ultra-efficient InstancedMesh!
-  const treeCount = isLowQuality ? 60 : 110;
-  const treeGeom = createPineTreeGeometry();
+  // 1. Distant Mountain Range Horizons
+  const distantMountains = createDistantMountains();
+  scene.add(distantMountains);
+
+  // 2. Offshore Sea Stacks & Jagged Reefs
+  const seaStacks = createOffshoreSeaStacks();
+  scene.add(seaStacks);
+
+  // 3. Dense Realistic Maritime Pine & Hardwood Trees
+  const treeCount = isLowQuality ? 80 : 150;
+  const treeGeom = createRealisticBranchingPineGeometry();
   const treeMat = new THREE.MeshStandardMaterial({
     color: '#28461f',
-    roughness: 0.8,
-    metalness: 0.1,
+    roughness: 0.75,
+    metalness: 0.08,
   });
   const treesMesh = new THREE.InstancedMesh(treeGeom, treeMat, treeCount);
-  treesMesh.castShadow = true;
+  treesMesh.castShadow = !isLowQuality;
   treesMesh.receiveShadow = true;
 
   const dummy = new THREE.Object3D();
@@ -233,30 +248,30 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   let placedTrees = 0;
   let attempts = 0;
 
-  while (placedTrees < treeCount && attempts < 800) {
+  while (placedTrees < treeCount && attempts < 900) {
     attempts++;
     const angle = Math.random() * Math.PI * 2;
-    const r = 10 + Math.random() * (ISLAND_RADIUS - 18);
+    const r = 12 + Math.random() * (ISLAND_RADIUS - 22);
     const tx = Math.cos(angle) * r;
     const tz = Math.sin(angle) * r;
     const ty = getTerrainHeight(tx, tz);
-    getTerrainNormal(tx, tz, tempNormal);
+    getTerrainNormal(tx, tz, tempNorm);
 
-    // Only plant trees on gentle grassy slopes above water and away from main paths
-    if (ty > 2.0 && ty < 14.5 && tempNormal.y > 0.82 && distanceToPath(tx, tz) > 3.5) {
-      // Avoid placing right on the lighthouse platform
-      if (Math.hypot(tx - 18, tz - (-30)) > 12) {
-        const scale = 0.8 + Math.random() * 0.45;
-        dummy.position.set(tx, ty - 0.2, tz);
+    if (ty > 2.0 && ty < 16.5 && tempNorm.y > 0.78 && distanceToPath(tx, tz) > 3.6) {
+      if (Math.hypot(tx - 18, tz - (-27)) > 15 && Math.hypot(tx - (-16), tz - (-26)) > 10) {
+        const s = 0.82 + Math.random() * 0.55;
+        dummy.position.set(tx, ty - 0.25, tz);
         dummy.rotation.y = Math.random() * Math.PI * 2;
-        dummy.rotation.x = (Math.random() - 0.5) * 0.08;
-        dummy.rotation.z = (Math.random() - 0.5) * 0.08;
-        dummy.scale.set(scale, scale, scale);
+        dummy.rotation.x = (Math.random() - 0.5) * 0.12;
+        dummy.rotation.z = (Math.random() - 0.5) * 0.12;
+        dummy.scale.set(s, s * (0.92 + Math.random() * 0.25), s);
         dummy.updateMatrix();
         treesMesh.setMatrixAt(placedTrees, dummy.matrix);
 
-        // Tint variation: deep forest pine to sunlit green
-        treeTint.setHSL(0.3 + (Math.random() - 0.5) * 0.05, 0.45, 0.22 + Math.random() * 0.1);
+        const h = 0.28 + (Math.random() - 0.5) * 0.07;
+        const sat = 0.44 + Math.random() * 0.18;
+        const l = 0.2 + Math.random() * 0.12;
+        treeTint.setHSL(h, sat, l);
         treesMesh.setColorAt(placedTrees, treeTint);
         placedTrees++;
       }
@@ -268,104 +283,85 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   treesMesh.computeBoundingSphere();
   scene.add(treesMesh);
 
-  // 2. Instanced Weathered Boulders along cliffs and coast
-  const rockCount = isLowQuality ? 45 : 90;
-  const boulderGeom = new THREE.DodecahedronGeometry(1.4, 1);
-  // Jitter vertices for organic rock roughness
-  const bPos = boulderGeom.attributes.position;
-  for (let i = 0; i < bPos.count; i++) {
-    bPos.setXYZ(
-      i,
-      bPos.getX(i) * (0.85 + Math.random() * 0.3),
-      bPos.getY(i) * (0.85 + Math.random() * 0.3),
-      bPos.getZ(i) * (0.85 + Math.random() * 0.3)
-    );
-  }
-  boulderGeom.computeVertexNormals();
-
+  // 4. Realistic Sculpted Rocks & Boulders
+  const rockCount = isLowQuality ? 60 : 120;
+  const rockMatData = createCliffRockMaterials();
+  const boulderGeom = createSculptedBoulderGeometry();
   const boulderMat = new THREE.MeshStandardMaterial({
-    map: rockTex,
-    color: '#706e6a',
-    roughness: 0.9,
-    metalness: 0.05,
+    map: rockMatData.map,
+    normalMap: rockMatData.normalMap,
+    roughness: 0.88,
+    metalness: 0.08,
   });
   const rocksMesh = new THREE.InstancedMesh(boulderGeom, boulderMat, rockCount);
-  rocksMesh.castShadow = true;
+  rocksMesh.castShadow = !isLowQuality;
   rocksMesh.receiveShadow = true;
 
   let placedRocks = 0;
   attempts = 0;
-  while (placedRocks < rockCount && attempts < 600) {
+  while (placedRocks < rockCount && attempts < 800) {
     attempts++;
     const angle = Math.random() * Math.PI * 2;
-    const r = 25 + Math.random() * (ISLAND_RADIUS - 10);
+    const r = 16 + Math.random() * (ISLAND_RADIUS - 6);
     const rx = Math.cos(angle) * r;
     const rz = Math.sin(angle) * r;
     const ry = getTerrainHeight(rx, rz);
-    getTerrainNormal(rx, rz, tempNormal);
+    getTerrainNormal(rx, rz, tempNorm);
 
-    if (ry > 0.2 && (tempNormal.y < 0.75 || ry < 2.5 || Math.hypot(rx - 45, rz - 10) < 25)) {
-      const scaleX = 0.8 + Math.random() * 1.6;
-      const scaleY = 0.6 + Math.random() * 1.2;
-      const scaleZ = 0.8 + Math.random() * 1.6;
-      dummy.position.set(rx, ry - 0.3, rz);
+    if (ry > 0.1 && (tempNorm.y < 0.76 || ry < 2.8 || Math.hypot(rx - 42, rz - 11) < 22)) {
+      const sx = 1.0 + Math.random() * 2.4;
+      const sy = 0.8 + Math.random() * 1.8;
+      const sz = 1.0 + Math.random() * 2.4;
+      dummy.position.set(rx, ry - 0.4, rz);
       dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      dummy.scale.set(scaleX, scaleY, scaleZ);
+      dummy.scale.set(sx, sy, sz);
       dummy.updateMatrix();
       rocksMesh.setMatrixAt(placedRocks, dummy.matrix);
-
-      treeTint.setRGB(
-        0.35 + Math.random() * 0.12,
-        0.34 + Math.random() * 0.12,
-        0.32 + Math.random() * 0.12
-      );
-      rocksMesh.setColorAt(placedRocks, treeTint);
       placedRocks++;
     }
   }
   rocksMesh.count = placedRocks;
   rocksMesh.instanceMatrix.needsUpdate = true;
-  if (rocksMesh.instanceColor) rocksMesh.instanceColor.needsUpdate = true;
   rocksMesh.computeBoundingSphere();
   scene.add(rocksMesh);
 
-  // 3. Instanced Wildflowers (Coastal Poppies & Bluebells in meadows)
-  const flowerCount = isLowQuality ? 70 : 160;
-  const flowerGeom = new THREE.SphereGeometry(0.18, 5, 4);
+  // 5. Wildflower Meadows (Poppies, Lupines, Daisies)
+  const flowerCount = isLowQuality ? 110 : 260;
+  const flowerGeom = new THREE.ConeGeometry(0.24, 0.52, 5);
+  flowerGeom.translate(0, 0.26, 0);
   const flowerMat = new THREE.MeshStandardMaterial({
-    roughness: 0.5,
-    metalness: 0.0,
+    roughness: 0.45,
+    metalness: 0.05,
   });
   const flowersMesh = new THREE.InstancedMesh(flowerGeom, flowerMat, flowerCount);
 
-  let placedFlowers = 0;
-  attempts = 0;
   const flowerPalette = [
-    new THREE.Color('#e04838'), // wild poppy orange-red
-    new THREE.Color('#4c7fe0'), // coastal bluebell
-    new THREE.Color('#f0c438'), // buttercup yellow
-    new THREE.Color('#f4f4f4'), // sea daisy white
-    new THREE.Color('#c25ce6'), // mountain lavender
+    new THREE.Color('#e85338'), // California poppy
+    new THREE.Color('#ffb703'), // Golden buttercup
+    new THREE.Color('#4361ee'), // Mountain lupine
+    new THREE.Color('#7209b7'), // Wild thistle purple
+    new THREE.Color('#f72585'), // Coastal pink mallow
+    new THREE.Color('#ffffff'), // Sea chamomile
   ];
 
-  while (placedFlowers < flowerCount && attempts < 800) {
+  let placedFlowers = 0;
+  attempts = 0;
+  while (placedFlowers < flowerCount && attempts < 900) {
     attempts++;
-    // Cluster near the flower meadow around (-12, 25) and sunny hillsides
-    const clusterCenterX = -12 + (Math.random() - 0.5) * 35;
-    const clusterCenterZ = 20 + (Math.random() - 0.5) * 35;
-    const fx = clusterCenterX + (Math.random() - 0.5) * 12;
-    const fz = clusterCenterZ + (Math.random() - 0.5) * 12;
+    const fx = -14 + (Math.random() - 0.5) * 45;
+    const fz = 25 + (Math.random() - 0.5) * 45;
     const fy = getTerrainHeight(fx, fz);
-    getTerrainNormal(fx, fz, tempNormal);
+    getTerrainNormal(fx, fz, tempNorm);
 
-    if (fy > 1.8 && fy < 11 && tempNormal.y > 0.85 && distanceToPath(fx, fz) > 1.2) {
-      dummy.position.set(fx, fy + 0.15, fz);
-      dummy.rotation.y = Math.random() * Math.PI * 2;
-      dummy.scale.set(1, 1.4, 1);
+    if (fy > 1.6 && fy < 13 && tempNorm.y > 0.82 && distanceToPath(fx, fz) > 1.0) {
+      dummy.position.set(fx, fy, fz);
+      dummy.rotation.set(0, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.15);
+      const s = 0.7 + Math.random() * 0.6;
+      dummy.scale.set(s, s * 1.2, s);
       dummy.updateMatrix();
       flowersMesh.setMatrixAt(placedFlowers, dummy.matrix);
-      const chosenColor = flowerPalette[Math.floor(Math.random() * flowerPalette.length)];
-      flowersMesh.setColorAt(placedFlowers, chosenColor);
+      const chosen = flowerPalette[Math.floor(Math.random() * flowerPalette.length)];
+      flowersMesh.setColorAt(placedFlowers, chosen);
       placedFlowers++;
     }
   }
@@ -375,59 +371,72 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   flowersMesh.computeBoundingSphere();
   scene.add(flowersMesh);
 
-  // 4. Instanced Grass Tufts for volumetric ground cover
-  const tuftCount = isLowQuality ? 80 : 200;
-  const tuftGeom = new THREE.ConeGeometry(0.35, 0.7, 4);
-  tuftGeom.translate(0, 0.35, 0);
-  const tuftMat = new THREE.MeshStandardMaterial({
-    color: '#467527',
-    roughness: 0.9,
-    metalness: 0.0,
+  // 6. Grass Blade Tufts
+  const grassCount = isLowQuality ? 130 : 340;
+  const grassGeom = createGrassTuftGeometry();
+  const grassMat = new THREE.MeshStandardMaterial({
+    color: '#497c2a',
+    roughness: 0.85,
+    metalness: 0.02,
   });
-  const grassTufts = new THREE.InstancedMesh(tuftGeom, tuftMat, tuftCount);
+  const grassBlades = new THREE.InstancedMesh(grassGeom, grassMat, grassCount);
 
-  let placedTufts = 0;
+  let placedGrass = 0;
   attempts = 0;
-  while (placedTufts < tuftCount && attempts < 900) {
+  while (placedGrass < grassCount && attempts < 1000) {
     attempts++;
-    const gx = (Math.random() - 0.5) * 110;
-    const gz = (Math.random() - 0.5) * 110;
+    const gx = (Math.random() - 0.5) * 125;
+    const gz = (Math.random() - 0.5) * 125;
     const gy = getTerrainHeight(gx, gz);
-    getTerrainNormal(gx, gz, tempNormal);
+    getTerrainNormal(gx, gz, tempNorm);
 
-    if (gy > 1.5 && gy < 14 && tempNormal.y > 0.8 && distanceToPath(gx, gz) > 0.8) {
-      const s = 0.7 + Math.random() * 0.6;
+    if (gy > 1.4 && gy < 16 && tempNorm.y > 0.8 && distanceToPath(gx, gz) > 0.6) {
+      const s = 0.75 + Math.random() * 0.6;
       dummy.position.set(gx, gy, gz);
-      dummy.rotation.set(0, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.2);
-      dummy.scale.set(s, s * (0.8 + Math.random() * 0.5), s);
+      dummy.rotation.set(0, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.15);
+      dummy.scale.set(s, s, s);
       dummy.updateMatrix();
-      grassTufts.setMatrixAt(placedTufts, dummy.matrix);
-      placedTufts++;
+      grassBlades.setMatrixAt(placedGrass, dummy.matrix);
+      placedGrass++;
     }
   }
-  grassTufts.count = placedTufts;
-  grassTufts.instanceMatrix.needsUpdate = true;
-  grassTufts.computeBoundingSphere();
-  scene.add(grassTufts);
+  grassBlades.count = placedGrass;
+  grassBlades.instanceMatrix.needsUpdate = true;
+  grassBlades.computeBoundingSphere();
+  scene.add(grassBlades);
 
-  // 5. Arrival Wooden Dock at (0, 52)
-  const dock = createWoodenDock();
-  dock.position.set(0, 0.35, 52);
+  // 7. Arrival Pier at Pelican Cove
+  const dock = createArtisanPier();
+  dock.position.set(0, 0.45, 56);
   scene.add(dock);
 
-  // 6. Waterfall Spray Particles at (45, -0.2, 10)
-  const sprayCount = 120;
+  // 8. Rustic Arch Bridge across the stream
+  const bridge = createWoodenArchBridge();
+  const bY = getTerrainHeight(-12, -4);
+  bridge.position.set(-12, bY + 0.2, -4);
+  bridge.rotation.y = Math.PI / 3;
+  scene.add(bridge);
+
+  // 9. Falcon's Perch Campfire & Sunset Bench
+  const { group: benchRest, fireLight, fireEmbers } = createCliffRestingLocation();
+  const restY = getTerrainHeight(-16, -26);
+  benchRest.position.set(-16, restY, -26);
+  benchRest.rotation.y = Math.PI / 4;
+  scene.add(benchRest);
+
+  // 10. Waterfall Basin Spray Particles
+  const sprayCount = 180;
   const sprayGeom = new THREE.BufferGeometry();
-  const sprayPos = new Float32Array(sprayCount * 3);
+  const sprayPositions = new Float32Array(sprayCount * 3);
   for (let i = 0; i < sprayCount; i++) {
-    sprayPos[i * 3] = 45 + (Math.random() - 0.5) * 4.5;
-    sprayPos[i * 3 + 1] = 0.2 + Math.random() * 2.2;
-    sprayPos[i * 3 + 2] = 10 + (Math.random() - 0.5) * 4.5;
+    sprayPositions[i * 3] = 42 + (Math.random() - 0.5) * 6.0;
+    sprayPositions[i * 3 + 1] = 0.3 + Math.random() * 3.5;
+    sprayPositions[i * 3 + 2] = 11 + (Math.random() - 0.5) * 6.0;
   }
-  sprayGeom.setAttribute('position', new THREE.BufferAttribute(sprayPos, 3));
+  sprayGeom.setAttribute('position', new THREE.BufferAttribute(sprayPositions, 3));
   const sprayMat = new THREE.PointsMaterial({
-    color: '#e4f6fc',
-    size: 0.35,
+    color: '#dcf6ff',
+    size: 0.45,
     transparent: true,
     opacity: 0.65,
     depthWrite: false,
@@ -435,143 +444,443 @@ export function createTerrainWorld(scene: THREE.Scene, isLowQuality: boolean = f
   const waterfallSpray = new THREE.Points(sprayGeom, sprayMat);
   scene.add(waterfallSpray);
 
+  // 11. Twilight Fireflies
+  const fireflyCount = 95;
+  const fireflyGeom = new THREE.BufferGeometry();
+  const fireflyPositions = new Float32Array(fireflyCount * 3);
+  const fireflyBasePos: { x: number; y: number; z: number; speed: number }[] = [];
+
+  for (let i = 0; i < fireflyCount; i++) {
+    const fx = -20 + (Math.random() - 0.5) * 65;
+    const fz = 10 + (Math.random() - 0.5) * 65;
+    const fy = getTerrainHeight(fx, fz) + 1.0 + Math.random() * 2.5;
+    fireflyPositions[i * 3] = fx;
+    fireflyPositions[i * 3 + 1] = fy;
+    fireflyPositions[i * 3 + 2] = fz;
+    fireflyBasePos.push({ x: fx, y: fy, z: fz, speed: 0.6 + Math.random() * 0.8 });
+  }
+  fireflyGeom.setAttribute('position', new THREE.BufferAttribute(fireflyPositions, 3));
+  const fireflyMat = new THREE.PointsMaterial({
+    color: '#ffea78',
+    size: 0.65,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const fireflies = new THREE.Points(fireflyGeom, fireflyMat);
+  scene.add(fireflies);
+
   return {
     mesh: terrainMesh,
     trees: treesMesh,
     rocks: rocksMesh,
     flowers: flowersMesh,
-    grassTufts,
+    grassBlades,
+    seaStacks,
+    distantMountains,
     dock,
+    bridge,
+    benchRest,
+    fireEmbers,
+    fireLight,
     waterfallSpray,
+    fireflies,
+    update: (time: number) => {
+      // Fireflies floating
+      const fPos = fireflyGeom.attributes.position;
+      for (let i = 0; i < fireflyCount; i++) {
+        const bp = fireflyBasePos[i];
+        fPos.setY(i, bp.y + Math.sin(time * bp.speed + i) * 0.45);
+        fPos.setX(i, bp.x + Math.cos(time * bp.speed * 0.7 + i) * 0.35);
+        fPos.setZ(i, bp.z + Math.sin(time * bp.speed * 0.5 + i) * 0.35);
+      }
+      fPos.needsUpdate = true;
+
+      // Waterfall spray
+      const sPos = sprayGeom.attributes.position;
+      for (let i = 0; i < sprayCount; i++) {
+        let sy = sPos.getY(i) + 0.04;
+        if (sy > 4.2) sy = 0.2 + Math.random() * 0.5;
+        sPos.setY(i, sy);
+      }
+      sPos.needsUpdate = true;
+
+      // Campfire flicker
+      fireLight.intensity = 2.2 + Math.sin(time * 12.0) * 0.3 + Math.cos(time * 22.0) * 0.2;
+
+      // Campfire rising embers
+      const ePos = fireEmbers.geometry.attributes.position;
+      for (let i = 0; i < ePos.count; i++) {
+        let ey = ePos.getY(i) + 0.025;
+        if (ey > 2.2) ey = 0.3 + Math.random() * 0.2;
+        ePos.setY(i, ey);
+        ePos.setX(i, Math.sin(time * 3 + i) * 0.15);
+        ePos.setZ(i, 0.8 + Math.cos(time * 3 + i) * 0.15);
+      }
+      ePos.needsUpdate = true;
+    },
   };
 }
 
-/**
- * Composite pine tree geometry (trunk + 3 staggered foliage cones)
- */
-function createPineTreeGeometry(): THREE.BufferGeometry {
-  const trunkGeom = new THREE.CylinderGeometry(0.2, 0.35, 2.5, 6);
-  trunkGeom.translate(0, 1.25, 0);
-
-  const foliage1 = new THREE.ConeGeometry(1.8, 2.6, 7);
-  foliage1.translate(0, 3.2, 0);
-
-  const foliage2 = new THREE.ConeGeometry(1.4, 2.3, 7);
-  foliage2.translate(0, 4.4, 0);
-
-  const foliage3 = new THREE.ConeGeometry(0.9, 1.8, 6);
-  foliage3.translate(0, 5.4, 0);
-
-  // Merge geometries into one
-  const geometries = [trunkGeom, foliage1, foliage2, foliage3];
-  let totalVertices = 0;
-  for (const g of geometries) totalVertices += g.attributes.position.count;
-
-  const mergedPos = new Float32Array(totalVertices * 3);
-  const mergedNorm = new Float32Array(totalVertices * 3);
-  let offset = 0;
-
-  for (const g of geometries) {
-    const pos = g.attributes.position;
-    const norm = g.attributes.normal;
-    for (let i = 0; i < pos.count; i++) {
-      mergedPos[(offset + i) * 3] = pos.getX(i);
-      mergedPos[(offset + i) * 3 + 1] = pos.getY(i);
-      mergedPos[(offset + i) * 3 + 2] = pos.getZ(i);
-      if (norm) {
-        mergedNorm[(offset + i) * 3] = norm.getX(i);
-        mergedNorm[(offset + i) * 3 + 1] = norm.getY(i);
-        mergedNorm[(offset + i) * 3 + 2] = norm.getZ(i);
-      }
-    }
-    offset += pos.count;
-  }
-
-  const merged = new THREE.BufferGeometry();
-  merged.setAttribute('position', new THREE.BufferAttribute(mergedPos, 3));
-  merged.setAttribute('normal', new THREE.BufferAttribute(mergedNorm, 3));
-  return merged;
-}
-
-/**
- * Composite wooden dock at the coastal landing bay
- */
-function createWoodenDock(): THREE.Group {
+function createDistantMountains(): THREE.Group {
   const group = new THREE.Group();
-  const woodMat = new THREE.MeshStandardMaterial({
-    color: '#654f3b',
-    roughness: 0.85,
+  const mountainMat = new THREE.MeshStandardMaterial({
+    color: '#344558',
+    roughness: 0.95,
     metalness: 0.05,
-  });
-  const darkWoodMat = new THREE.MeshStandardMaterial({
-    color: '#3d2e20',
-    roughness: 0.9,
-    metalness: 0.05,
+    flatShading: true,
   });
 
-  // Dock walkway planks
-  const plankGeom = new THREE.BoxGeometry(3.2, 0.16, 0.7);
-  for (let z = -5; z <= 7; z += 0.8) {
-    const plank = new THREE.Mesh(plankGeom, woodMat);
-    plank.position.set(0, 0.4, z);
-    plank.castShadow = true;
-    plank.receiveShadow = true;
-    group.add(plank);
+  const ranges: { angle: number; dist: number; width: number; height: number }[] = [
+    { angle: -0.85, dist: 320, width: 230, height: 70 },
+    { angle: -0.22, dist: 370, width: 290, height: 90 },
+    { angle: 0.48, dist: 340, width: 250, height: 80 },
+    { angle: 1.38, dist: 390, width: 270, height: 85 },
+    { angle: 2.28, dist: 350, width: 220, height: 65 },
+  ];
+
+  for (const r of ranges) {
+    const geom = new THREE.ConeGeometry(r.width * 0.5, r.height, 7);
+    geom.scale(1.0, 1.0, 0.45);
+    const mesh = new THREE.Mesh(geom, mountainMat);
+    const mx = Math.cos(r.angle) * r.dist;
+    const mz = Math.sin(r.angle) * r.dist;
+    mesh.position.set(mx, r.height * 0.4 - 10, mz);
+    mesh.rotation.y = r.angle + Math.PI / 2;
+    group.add(mesh);
   }
-
-  // Support stilts sunken into the seabed
-  const postGeom = new THREE.CylinderGeometry(0.12, 0.14, 2.5, 6);
-  for (const x of [-1.4, 1.4]) {
-    for (const z of [-4, 0, 4, 7]) {
-      const post = new THREE.Mesh(postGeom, darkWoodMat);
-      post.position.set(x, -0.6, z);
-      post.castShadow = true;
-      group.add(post);
-    }
-  }
-
-  // Mooring bollards & lantern post
-  const bollardGeom = new THREE.CylinderGeometry(0.1, 0.12, 0.6, 6);
-  const bollard1 = new THREE.Mesh(bollardGeom, darkWoodMat);
-  bollard1.position.set(-1.4, 0.7, 6.8);
-  const bollard2 = new THREE.Mesh(bollardGeom, darkWoodMat);
-  bollard2.position.set(1.4, 0.7, 6.8);
-  group.add(bollard1, bollard2);
-
-  // Small rowboat moored to the dock
-  const boat = createRowboat();
-  boat.position.set(3.0, -0.15, 4.5);
-  boat.rotation.y = -0.35;
-  group.add(boat);
 
   return group;
 }
 
-function createRowboat(): THREE.Group {
-  const boat = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({
-    color: '#8b4513',
-    roughness: 0.75,
+function createOffshoreSeaStacks(): THREE.Group {
+  const group = new THREE.Group();
+  const stackMat = new THREE.MeshStandardMaterial({
+    color: '#464340',
+    roughness: 0.9,
+    metalness: 0.1,
+    flatShading: true,
   });
-  const interiorMat = new THREE.MeshStandardMaterial({
-    color: '#5c2c0e',
+
+  const stacks: [number, number, number, number][] = [
+    [-65, -85, 9, 22],
+    [-92, -55, 7, 18],
+    [75, -70, 8, 20],
+    [90, 40, 6, 14],
+    [-78, 65, 8, 16],
+  ];
+
+  for (const [x, z, r, h] of stacks) {
+    const geom = new THREE.CylinderGeometry(r * 0.4, r, h, 6);
+    const mesh = new THREE.Mesh(geom, stackMat);
+    mesh.position.set(x, h * 0.4 - 2, z);
+    mesh.rotation.y = Math.random() * Math.PI;
+    mesh.rotation.x = (Math.random() - 0.5) * 0.15;
+    group.add(mesh);
+  }
+
+  return group;
+}
+
+function createRealisticBranchingPineGeometry(): THREE.BufferGeometry {
+  const trunkCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0.12, 1.2, 0.06),
+    new THREE.Vector3(-0.06, 2.6, 0.12),
+    new THREE.Vector3(0, 4.0, 0),
+  ]);
+  const trunkGeom = new THREE.TubeGeometry(trunkCurve, 8, 0.3, 7, false);
+
+  // Staggered tiered canopy clusters
+  const f1 = new THREE.DodecahedronGeometry(2.1, 1);
+  f1.scale(1.25, 0.7, 1.25);
+  f1.translate(0, 3.6, 0);
+
+  const f2 = new THREE.DodecahedronGeometry(1.7, 1);
+  f2.scale(1.15, 0.65, 1.15);
+  f2.translate(0.18, 4.8, -0.12);
+
+  const f3 = new THREE.DodecahedronGeometry(1.25, 1);
+  f3.scale(1.05, 0.6, 1.05);
+  f3.translate(-0.12, 5.8, 0.12);
+
+  const f4 = new THREE.DodecahedronGeometry(0.85, 1);
+  f4.translate(0, 6.7, 0);
+
+  const geoms = [trunkGeom, f1, f2, f3, f4];
+  let vCount = 0;
+  for (const g of geoms) vCount += g.attributes.position.count;
+
+  const mPos = new Float32Array(vCount * 3);
+  const mNorm = new Float32Array(vCount * 3);
+  let off = 0;
+
+  for (const g of geoms) {
+    const p = g.attributes.position;
+    const n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) {
+      mPos[(off + i) * 3] = p.getX(i);
+      mPos[(off + i) * 3 + 1] = p.getY(i);
+      mPos[(off + i) * 3 + 2] = p.getZ(i);
+      if (n) {
+        mNorm[(off + i) * 3] = n.getX(i);
+        mNorm[(off + i) * 3 + 1] = n.getY(i);
+        mNorm[(off + i) * 3 + 2] = n.getZ(i);
+      }
+    }
+    off += p.count;
+  }
+
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(mNorm, 3));
+  return merged;
+}
+
+function createSculptedBoulderGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.DodecahedronGeometry(1.5, 1);
+  const p = geom.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const jx = p.getX(i) * (0.8 + Math.random() * 0.4);
+    const jy = p.getY(i) * (0.7 + Math.random() * 0.4);
+    const jz = p.getZ(i) * (0.8 + Math.random() * 0.4);
+    p.setXYZ(i, jx, jy, jz);
+  }
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function createGrassTuftGeometry(): THREE.BufferGeometry {
+  const g1 = new THREE.PlaneGeometry(0.65, 0.8);
+  g1.translate(0, 0.4, 0);
+
+  const g2 = new THREE.PlaneGeometry(0.65, 0.8);
+  g2.rotateY(Math.PI / 3);
+  g2.translate(0, 0.4, 0);
+
+  const g3 = new THREE.PlaneGeometry(0.65, 0.8);
+  g3.rotateY((Math.PI / 3) * 2);
+  g3.translate(0, 0.4, 0);
+
+  const geoms = [g1, g2, g3];
+  let vCount = 0;
+  for (const g of geoms) vCount += g.attributes.position.count;
+
+  const mPos = new Float32Array(vCount * 3);
+  const mNorm = new Float32Array(vCount * 3);
+  let off = 0;
+
+  for (const g of geoms) {
+    const p = g.attributes.position;
+    const n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) {
+      mPos[(off + i) * 3] = p.getX(i);
+      mPos[(off + i) * 3 + 1] = p.getY(i);
+      mPos[(off + i) * 3 + 2] = p.getZ(i);
+      if (n) {
+        mNorm[(off + i) * 3] = n.getX(i);
+        mNorm[(off + i) * 3 + 1] = n.getY(i);
+        mNorm[(off + i) * 3 + 2] = n.getZ(i);
+      }
+    }
+    off += p.count;
+  }
+
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(mNorm, 3));
+  return merged;
+}
+
+function createArtisanPier(): THREE.Group {
+  const pier = new THREE.Group();
+  const woodData = createWoodPlankMaterials();
+  const pierMat = new THREE.MeshStandardMaterial({
+    map: woodData.map,
+    normalMap: woodData.normalMap,
+    roughness: 0.85,
+    metalness: 0.05,
+  });
+
+  const darkWoodMat = new THREE.MeshStandardMaterial({
+    color: '#342618',
+    roughness: 0.9,
+    metalness: 0.02,
+  });
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.22, 14), pierMat);
+  deck.position.set(0, 0.35, 0);
+  deck.castShadow = true;
+  deck.receiveShadow = true;
+  pier.add(deck);
+
+  const pilingGeom = new THREE.CylinderGeometry(0.18, 0.2, 3.2, 8);
+  for (const x of [-1.65, 1.65]) {
+    for (let z = -6; z <= 6; z += 3) {
+      const p = new THREE.Mesh(pilingGeom, darkWoodMat);
+      p.position.set(x, -1.0, z);
+      p.castShadow = true;
+      pier.add(p);
+    }
+  }
+
+  const bollardGeom = new THREE.CylinderGeometry(0.12, 0.14, 0.65, 8);
+  const b1 = new THREE.Mesh(bollardGeom, darkWoodMat);
+  b1.position.set(-1.5, 0.75, 6.2);
+  const b2 = new THREE.Mesh(bollardGeom, darkWoodMat);
+  b2.position.set(1.5, 0.75, 6.2);
+  pier.add(b1, b2);
+
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.8, 6), darkWoodMat);
+  post.position.set(1.5, 1.5, 6.2);
+  pier.add(post);
+
+  const lanternCase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.45, 0.3),
+    new THREE.MeshStandardMaterial({ color: '#1a1816', roughness: 0.5, metalness: 0.8 })
+  );
+  lanternCase.position.set(1.5, 2.7, 6.2);
+  pier.add(lanternCase);
+
+  const lanternBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 8, 8),
+    new THREE.MeshBasicMaterial({ color: '#ffbd59' })
+  );
+  lanternBulb.position.set(1.5, 2.7, 6.2);
+  pier.add(lanternBulb);
+
+  const lanternLight = new THREE.PointLight(0xffb042, 1.8, 10);
+  lanternLight.position.set(1.5, 2.7, 6.2);
+  pier.add(lanternLight);
+
+  return pier;
+}
+
+function createWoodenArchBridge(): THREE.Group {
+  const bridge = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: '#654f3b',
+    roughness: 0.82,
+    metalness: 0.05,
+  });
+  const railMat = new THREE.MeshStandardMaterial({
+    color: '#463524',
     roughness: 0.85,
   });
 
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.7, 3.2), hullMat);
-  hull.castShadow = true;
-  boat.add(hull);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 7.5), woodMat);
+  deck.castShadow = true;
+  deck.receiveShadow = true;
+  bridge.add(deck);
 
-  const interior = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.6, 2.8), interiorMat);
-  interior.position.y = 0.15;
-  boat.add(interior);
+  const postGeom = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 6);
+  const railGeom = new THREE.BoxGeometry(0.1, 0.1, 7.5);
 
-  // Oars
-  const oarMat = new THREE.MeshStandardMaterial({ color: '#c29b68' });
-  const oar1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 5), oarMat);
-  oar1.rotation.z = Math.PI / 3;
-  oar1.position.set(-0.8, 0.4, 0);
-  boat.add(oar1);
+  for (const x of [-1.15, 1.15]) {
+    const rail = new THREE.Mesh(railGeom, railMat);
+    rail.position.set(x, 0.85, 0);
+    rail.castShadow = true;
+    bridge.add(rail);
 
-  return boat;
+    for (let z = -3.2; z <= 3.2; z += 1.6) {
+      const p = new THREE.Mesh(postGeom, railMat);
+      p.position.set(x, 0.45, z);
+      p.castShadow = true;
+      bridge.add(p);
+    }
+  }
+
+  return bridge;
+}
+
+function createCliffRestingLocation(): {
+  group: THREE.Group;
+  fireLight: THREE.PointLight;
+  fireEmbers: THREE.Points;
+} {
+  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({
+    color: '#5c4532',
+    roughness: 0.78,
+  });
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: '#686561',
+    roughness: 0.9,
+  });
+
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.8, 0.2, 8), stoneMat);
+  floor.position.y = 0.1;
+  floor.receiveShadow = true;
+  group.add(floor);
+
+  // Wooden bench
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.65), woodMat);
+  seat.position.set(0, 0.52, -1.2);
+  seat.castShadow = true;
+  group.add(seat);
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 0.1), woodMat);
+  back.position.set(0, 0.85, -1.5);
+  back.castShadow = true;
+  group.add(back);
+
+  for (const x of [-0.95, 0.95]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.55), woodMat);
+    leg.position.set(x, 0.25, -1.2);
+    leg.castShadow = true;
+    group.add(leg);
+  }
+
+  // Stone ring campfire
+  const fireRing = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.14, 6, 8), stoneMat);
+  fireRing.rotateX(Math.PI / 2);
+  fireRing.position.set(0, 0.25, 0.8);
+  group.add(fireRing);
+
+  // Campfire logs
+  const logMat = new THREE.MeshStandardMaterial({ color: '#2b1b11', roughness: 0.9 });
+  const logGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.9, 6);
+  logGeom.rotateZ(Math.PI / 3);
+  const log1 = new THREE.Mesh(logGeom, logMat);
+  log1.position.set(0, 0.26, 0.8);
+  const log2 = new THREE.Mesh(logGeom, logMat);
+  log2.position.set(0, 0.26, 0.8);
+  log2.rotation.y = Math.PI / 2;
+  group.add(log1, log2);
+
+  // Glowing coals
+  const coals = new THREE.Mesh(
+    new THREE.SphereGeometry(0.35, 6, 5),
+    new THREE.MeshBasicMaterial({ color: '#ff5500' })
+  );
+  coals.position.set(0, 0.28, 0.8);
+  group.add(coals);
+
+  const fireLight = new THREE.PointLight(0xff7700, 2.4, 9, 1.2);
+  fireLight.position.set(0, 0.65, 0.8);
+  group.add(fireLight);
+
+  // Rising fire embers particles
+  const emberCount = 35;
+  const emberGeom = new THREE.BufferGeometry();
+  const emberPositions = new Float32Array(emberCount * 3);
+  for (let i = 0; i < emberCount; i++) {
+    emberPositions[i * 3] = (Math.random() - 0.5) * 0.4;
+    emberPositions[i * 3 + 1] = 0.3 + Math.random() * 1.5;
+    emberPositions[i * 3 + 2] = 0.8 + (Math.random() - 0.5) * 0.4;
+  }
+  emberGeom.setAttribute('position', new THREE.BufferAttribute(emberPositions, 3));
+  const emberMat = new THREE.PointsMaterial({
+    color: '#ffbb33',
+    size: 0.2,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const fireEmbers = new THREE.Points(emberGeom, emberMat);
+  group.add(fireEmbers);
+
+  return { group, fireLight, fireEmbers };
 }

@@ -7,9 +7,11 @@ export interface GameSettings {
   soundVolume: number;
   ambienceVolume: number;
   musicMuted: boolean;
-  timeOfDay: number; // 0 to 24 (e.g. 17.5 = 5:30 PM sunset)
+  timeOfDay: number; // 0 to 24 (17.5 = 5:30 PM golden hour)
   autoCycleTime: boolean;
   touchControls: boolean;
+  showCinematicBars: boolean;
+  zenMode: boolean; // 100% clean screen without any HUD
 }
 
 export interface Landmark {
@@ -19,7 +21,8 @@ export interface Landmark {
   x: number;
   z: number;
   radius: number;
-  unlocked: boolean;
+  actionType: 'read' | 'sit' | 'inspect';
+  promptLabel: string;
   noteContent?: {
     header: string;
     body: string;
@@ -36,6 +39,7 @@ export interface PlayerInput {
   run: boolean;
   jump: boolean;
   interact: boolean;
+  sit: boolean;
   joystickX: number; // -1 to 1
   joystickY: number; // -1 to 1
   cameraDeltaX: number;
@@ -45,11 +49,12 @@ export interface PlayerInput {
 export interface GameState {
   playing: boolean;
   paused: boolean;
+  isSitting: boolean;
   timeOfDay: number;
   currentLocationName: string;
   activeLandmark: Landmark | null;
   readingNote: Landmark | null;
-  discoveredLandmarkIds: string[];
-  totalLandmarks: number;
   fps: number;
+  zenMode: boolean;
+  cinematicLetterbox: boolean;
 }

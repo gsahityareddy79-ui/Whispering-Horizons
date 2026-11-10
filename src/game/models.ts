@@ -1,59 +1,53 @@
 import * as THREE from 'three';
-import { createBarkTexture, createRockTexture } from './proceduralTextures';
+import { createWoodPlankMaterials, createCliffRockMaterials } from './proceduralTextures';
 
 /**
- * Procedural Composite Models for Whispering Horizons
- * Follows the 3-12 part procedural model standard with varied roughness/metalness.
+ * High-Fidelity 3D Models for Whispering Horizons
+ * Features a realistic proportioned humanoid character, detailed architectural lighthouse,
+ * and intricate coastal structures.
  */
 
-// Materials shared across procedural props
-const stoneMat = new THREE.MeshStandardMaterial({
-  color: '#848079',
-  roughness: 0.85,
+// Shared PBR materials
+const stoneMasonryMat = new THREE.MeshStandardMaterial({
+  color: '#8c8880',
+  roughness: 0.82,
   metalness: 0.05,
 });
 
 const whitePlasterMat = new THREE.MeshStandardMaterial({
-  color: '#e8e6df',
-  roughness: 0.7,
+  color: '#ece9e2',
+  roughness: 0.65,
   metalness: 0.02,
 });
 
-const redTrimMat = new THREE.MeshStandardMaterial({
-  color: '#8f2923',
-  roughness: 0.6,
-  metalness: 0.1,
-});
-
-const brassMat = new THREE.MeshStandardMaterial({
-  color: '#d4af37',
-  roughness: 0.25,
-  metalness: 0.85,
-});
-
-const copperRoofMat = new THREE.MeshStandardMaterial({
-  color: '#3d7864', // aged verdigris copper
+const maritimeRedMat = new THREE.MeshStandardMaterial({
+  color: '#9e2a2b',
   roughness: 0.55,
+  metalness: 0.08,
+});
+
+const verdigrisCopperMat = new THREE.MeshStandardMaterial({
+  color: '#387361',
+  roughness: 0.5,
   metalness: 0.35,
 });
 
-const glassMat = new THREE.MeshPhysicalMaterial({
-  color: '#d4f2f7',
-  roughness: 0.1,
-  metalness: 0.1,
-  transparent: true,
-  opacity: 0.45,
+const polishedBrassMat = new THREE.MeshStandardMaterial({
+  color: '#d4af37',
+  roughness: 0.22,
+  metalness: 0.88,
 });
 
-const woodMat = new THREE.MeshStandardMaterial({
-  color: '#5a422e',
-  roughness: 0.8,
-  metalness: 0.05,
+const glassLensMat = new THREE.MeshPhysicalMaterial({
+  color: '#e4f7fa',
+  roughness: 0.08,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.5,
 });
 
 /**
- * 1. The Grand Lighthouse (Summit Landmark at 18, -30)
- * 8-part composite architectural structure
+ * 1. The Grand Summit Lighthouse
  */
 export interface LighthouseStructure {
   group: THREE.Group;
@@ -66,116 +60,139 @@ export interface LighthouseStructure {
 export function createLighthouse(): LighthouseStructure {
   const group = new THREE.Group();
 
-  // Part 1: Flared Octagonal Stone Plinth Foundation
-  const baseGeom = new THREE.CylinderGeometry(4.2, 4.8, 2.5, 8);
-  const base = new THREE.Mesh(baseGeom, stoneMat);
-  base.position.y = 1.25;
-  base.castShadow = true;
-  base.receiveShadow = true;
-  group.add(base);
+  // Tier 1: Octagonal Stone Foundation Plinth
+  const plinthGeom = new THREE.CylinderGeometry(4.8, 5.4, 3.2, 8);
+  const plinth = new THREE.Mesh(plinthGeom, stoneMasonryMat);
+  plinth.position.y = 1.6;
+  plinth.castShadow = true;
+  plinth.receiveShadow = true;
+  group.add(plinth);
 
-  // Entrance steps
-  const stepsGeom = new THREE.BoxGeometry(2.0, 0.4, 2.2);
-  const steps = new THREE.Mesh(stepsGeom, stoneMat);
-  steps.position.set(0, 0.2, 4.5);
-  steps.castShadow = true;
-  group.add(steps);
+  // Arched Stone Entrance Portico
+  const porticoGeom = new THREE.BoxGeometry(2.2, 3.0, 1.2);
+  const portico = new THREE.Mesh(porticoGeom, stoneMasonryMat);
+  portico.position.set(0, 1.5, 4.8);
+  portico.castShadow = true;
+  group.add(portico);
 
-  // Wooden entrance door
-  const doorGeom = new THREE.BoxGeometry(1.2, 2.0, 0.2);
-  const door = new THREE.Mesh(doorGeom, woodMat);
-  door.position.set(0, 1.8, 4.0);
+  // Studded heavy oak entrance door
+  const doorGeom = new THREE.BoxGeometry(1.4, 2.3, 0.2);
+  const doorMat = new THREE.MeshStandardMaterial({ color: '#4a3319', roughness: 0.85 });
+  const door = new THREE.Mesh(doorGeom, doorMat);
+  door.position.set(0, 1.35, 5.4);
   door.castShadow = true;
   group.add(door);
 
-  // Part 2: Main Tapered White Masonry Shaft
-  const shaftGeom = new THREE.CylinderGeometry(2.6, 3.8, 14.0, 12);
+  // Entry flight of stone steps
+  for (let s = 0; s < 3; s++) {
+    const stepGeom = new THREE.BoxGeometry(2.4 - s * 0.2, 0.25, 0.6);
+    const step = new THREE.Mesh(stepGeom, stoneMasonryMat);
+    step.position.set(0, 0.12 + s * 0.25, 5.6 + (2 - s) * 0.55);
+    step.castShadow = true;
+    group.add(step);
+  }
+
+  // Tier 2: Tapered Main Masonry Tower Shaft
+  const shaftGeom = new THREE.CylinderGeometry(2.8, 4.2, 16.0, 16);
   const shaft = new THREE.Mesh(shaftGeom, whitePlasterMat);
-  shaft.position.y = 9.5;
+  shaft.position.y = 11.2;
   shaft.castShadow = true;
   shaft.receiveShadow = true;
   group.add(shaft);
 
-  // Horizontal decorative red navigation bands
-  const bandGeom = new THREE.CylinderGeometry(3.3, 3.4, 1.8, 12);
-  const band = new THREE.Mesh(bandGeom, redTrimMat);
-  band.position.y = 8.5;
-  band.castShadow = true;
-  group.add(band);
+  // Decorative Navigation Bands (Deep Maritime Red)
+  const band1 = new THREE.Mesh(new THREE.CylinderGeometry(3.55, 3.75, 2.0, 16), maritimeRedMat);
+  band1.position.y = 9.0;
+  band1.castShadow = true;
+  group.add(band1);
 
-  const upperBandGeom = new THREE.CylinderGeometry(2.8, 2.9, 1.4, 12);
-  const upperBand = new THREE.Mesh(upperBandGeom, redTrimMat);
-  upperBand.position.y = 13.5;
-  upperBand.castShadow = true;
-  group.add(upperBand);
+  const band2 = new THREE.Mesh(new THREE.CylinderGeometry(3.05, 3.25, 2.0, 16), maritimeRedMat);
+  band2.position.y = 14.5;
+  band2.castShadow = true;
+  group.add(band2);
 
-  // Part 3: Observation Gallery Platform
-  const galleryFloorGeom = new THREE.CylinderGeometry(3.6, 3.0, 0.8, 12);
-  const galleryFloor = new THREE.Mesh(galleryFloorGeom, stoneMat);
-  galleryFloor.position.y = 16.8;
-  galleryFloor.castShadow = true;
-  group.add(galleryFloor);
+  // Arched Windows in shaft
+  const windowGeom = new THREE.BoxGeometry(0.5, 0.9, 0.2);
+  const windowMat = new THREE.MeshStandardMaterial({ color: '#16222f', roughness: 0.2, metalness: 0.8 });
+  for (const y of [7.5, 12.0, 16.5]) {
+    const win = new THREE.Mesh(windowGeom, windowMat);
+    win.position.set(0, y, 3.4 - (y - 7.5) * 0.08);
+    group.add(win);
+  }
 
-  // Gallery Railing (Iron)
-  const railingGeom = new THREE.CylinderGeometry(3.55, 3.55, 1.0, 12, 1, true);
-  const railingMat = new THREE.MeshStandardMaterial({ color: '#222222', roughness: 0.5, metalness: 0.8, wireframe: true });
-  const railing = new THREE.Mesh(railingGeom, railingMat);
-  railing.position.y = 17.7;
+  // Tier 3: Observation Gallery with Corbels & Iron Railing
+  const galleryBase = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 3.2, 1.0, 16), stoneMasonryMat);
+  galleryBase.position.y = 19.5;
+  galleryBase.castShadow = true;
+  group.add(galleryBase);
+
+  // Iron Railing
+  const railGeom = new THREE.CylinderGeometry(3.95, 3.95, 1.1, 16, 1, true);
+  const railMat = new THREE.MeshStandardMaterial({
+    color: '#1a1a1a',
+    roughness: 0.5,
+    metalness: 0.85,
+    wireframe: true,
+  });
+  const railing = new THREE.Mesh(railGeom, railMat);
+  railing.position.y = 20.5;
   group.add(railing);
 
-  // Part 4: Lantern Room Glass Enclosure
-  const lanternGlassGeom = new THREE.CylinderGeometry(2.2, 2.2, 2.8, 8);
-  const lanternGlass = new THREE.Mesh(lanternGlassGeom, glassMat);
-  lanternGlass.position.y = 18.6;
-  group.add(lanternGlass);
+  // Tier 4: Glass Lantern Room Housing
+  const lanternRoom = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 3.2, 12), glassLensMat);
+  lanternRoom.position.y = 21.6;
+  group.add(lanternRoom);
 
-  // Part 5: Copper Dome Cupola & Weather Vane
-  const domeGeom = new THREE.SphereGeometry(2.3, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  const dome = new THREE.Mesh(domeGeom, copperRoofMat);
-  dome.position.y = 20.0;
-  dome.castShadow = true;
-  group.add(dome);
+  // Brass Frame Mullions
+  const frameRing = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.08, 6, 16), polishedBrassMat);
+  frameRing.rotateX(Math.PI / 2);
+  frameRing.position.y = 21.6;
+  group.add(frameRing);
 
-  // Weather vane spire
-  const spireGeom = new THREE.CylinderGeometry(0.06, 0.08, 1.8, 6);
-  const spire = new THREE.Mesh(spireGeom, brassMat);
-  spire.position.y = 21.8;
+  // Tier 5: Verdigris Copper Cupola Dome & Spire
+  const cupolaGeom = new THREE.SphereGeometry(2.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cupola = new THREE.Mesh(cupolaGeom, verdigrisCopperMat);
+  cupola.position.y = 23.2;
+  cupola.castShadow = true;
+  group.add(cupola);
+
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 2.2, 6), polishedBrassMat);
+  spire.position.y = 25.2;
   group.add(spire);
 
-  // Part 6: Glowing Fresnel Lens Core & Rotating Beacon
-  const beaconCoreGeom = new THREE.CylinderGeometry(0.6, 0.6, 1.2, 8);
-  const beaconMat = new THREE.MeshBasicMaterial({ color: '#fff6c2' });
-  const beaconMesh = new THREE.Mesh(beaconCoreGeom, beaconMat);
-  beaconMesh.position.y = 18.6;
+  // Tier 6: Glowing Fresnel Beacon Core
+  const beaconMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.7, 0.7, 1.4, 8),
+    new THREE.MeshBasicMaterial({ color: '#fff9d6' })
+  );
+  beaconMesh.position.y = 21.6;
   group.add(beaconMesh);
 
-  // High-intensity Rotating Spotlight
-  const beaconLight = new THREE.SpotLight(0xfff1aa, 12, 120, Math.PI / 8, 0.3, 1.2);
-  beaconLight.position.set(0, 18.6, 0);
-  beaconLight.castShadow = false; // keep frame rates silky smooth
-
-  const lightTarget = new THREE.Object3D();
-  lightTarget.position.set(40, 16, 0);
-  group.add(lightTarget);
-  beaconLight.target = lightTarget;
+  // High-Powered Sweeping Searchlight
+  const beaconLight = new THREE.SpotLight(0xfff3b0, 16, 160, Math.PI / 7, 0.25, 1.1);
+  beaconLight.position.set(0, 21.6, 0);
+  const targetObj = new THREE.Object3D();
+  targetObj.position.set(50, 18, 0);
+  group.add(targetObj);
+  beaconLight.target = targetObj;
   group.add(beaconLight);
 
-  // Volumetric Light Beam Cone
-  const coneGeom = new THREE.ConeGeometry(8, 70, 16, 1, true);
+  // Volumetric Sweeping Light Beam Cone
+  const coneGeom = new THREE.ConeGeometry(9, 85, 16, 1, true);
   coneGeom.rotateX(Math.PI / 2);
-  coneGeom.translate(0, 0, 35);
+  coneGeom.translate(0, 0, 42.5);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: '#ffefa0',
+    color: '#ffefa8',
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.22,
     depthWrite: false,
     side: THREE.DoubleSide,
   });
   const lightCone = new THREE.Mesh(coneGeom, coneMat);
-  lightCone.position.set(0, 18.6, 0);
+  lightCone.position.set(0, 21.6, 0);
   group.add(lightCone);
 
-  let angle = 0;
+  let rotAngle = 0;
 
   return {
     group,
@@ -183,206 +200,349 @@ export function createLighthouse(): LighthouseStructure {
     beaconMesh,
     lightCone,
     update: (delta: number) => {
-      angle += delta * 0.8;
-      const tx = Math.cos(angle) * 60;
-      const tz = Math.sin(angle) * 60;
-      lightTarget.position.set(tx, 16, tz);
-      lightCone.rotation.y = -angle + Math.PI / 2;
+      rotAngle += delta * 0.75;
+      const lx = Math.cos(rotAngle) * 70;
+      const lz = Math.sin(rotAngle) * 70;
+      targetObj.position.set(lx, 18, lz);
+      lightCone.rotation.y = -rotAngle + Math.PI / 2;
     },
   };
 }
 
 /**
- * 2. Third-Person Explorer Character (The Wanderer)
- * 10-part procedural character with articulated joints for walk/run animations
+ * 2. Proper Humanoid Explorer Character
+ * Features natural human proportions, articulated skeleton, and multi-state animations
+ * (Walk, Run, Idle Breathing, and Sitting/Resting).
  */
 export interface CharacterModel {
   group: THREE.Group;
   lanternLight: THREE.PointLight;
-  setAnimation: (speed: number, delta: number, isGrounded: boolean) => void;
+  setAnimation: (speed: number, delta: number, isGrounded: boolean, isSitting: boolean) => void;
 }
 
-export function createCharacter(): CharacterModel {
+export function createHumanoidCharacter(): CharacterModel {
   const group = new THREE.Group();
 
-  // Apparel materials
+  // Natural fabric and anatomical materials
   const coatMat = new THREE.MeshStandardMaterial({
-    color: '#2a4452', // deep teal voyager coat
+    color: '#264653', // Deep maritime teal voyager duster
     roughness: 0.7,
-    metalness: 0.1,
+    metalness: 0.08,
+  });
+  const shirtMat = new THREE.MeshStandardMaterial({
+    color: '#e9d8a6', // Linen undershirt
+    roughness: 0.75,
   });
   const pantsMat = new THREE.MeshStandardMaterial({
-    color: '#3d372e', // sturdy travel breeches
+    color: '#343a40', // Charcoal explorer breeches
     roughness: 0.8,
   });
   const leatherMat = new THREE.MeshStandardMaterial({
-    color: '#4e2a14', // brown leather boots & satchel
-    roughness: 0.6,
+    color: '#5c3d28', // Brown oiled leather
+    roughness: 0.55,
   });
   const skinMat = new THREE.MeshStandardMaterial({
-    color: '#d99f77',
+    color: '#e0a96d', // Warm skin tone
+    roughness: 0.75,
+  });
+  const hairMat = new THREE.MeshStandardMaterial({
+    color: '#332211',
     roughness: 0.85,
   });
   const hatMat = new THREE.MeshStandardMaterial({
-    color: '#252525', // explorer brimmed hat
-    roughness: 0.7,
+    color: '#2b2d42', // Fedora grey-navy
+    roughness: 0.65,
   });
   const scarfMat = new THREE.MeshStandardMaterial({
-    color: '#9e3223', // red traveler scarf
+    color: '#b23a22', // Red wool scarf
     roughness: 0.6,
   });
 
-  // Torso / Jacket
-  const torsoGeom = new THREE.BoxGeometry(0.55, 0.65, 0.35);
-  const torso = new THREE.Mesh(torsoGeom, coatMat);
-  torso.position.y = 1.05;
-  torso.castShadow = true;
-  group.add(torso);
+  // Root Pelvis Node
+  const pelvis = new THREE.Group();
+  pelvis.position.y = 0.88;
+  group.add(pelvis);
 
-  // Satchel / Explorer Backpack
-  const packGeom = new THREE.BoxGeometry(0.42, 0.45, 0.22);
-  const backpack = new THREE.Mesh(packGeom, leatherMat);
-  backpack.position.set(0, 1.08, -0.25);
-  backpack.castShadow = true;
-  group.add(backpack);
+  // Pelvis / Waist mesh
+  const waistGeom = new THREE.BoxGeometry(0.42, 0.22, 0.28);
+  const waist = new THREE.Mesh(waistGeom, pantsMat);
+  waist.castShadow = true;
+  pelvis.add(waist);
 
-  // Rolled blanket on top of pack
-  const bedrollGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.48, 8);
+  // Leather Belt with Brass Buckle
+  const beltGeom = new THREE.BoxGeometry(0.44, 0.08, 0.3);
+  const belt = new THREE.Mesh(beltGeom, leatherMat);
+  pelvis.add(belt);
+
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.32), polishedBrassMat);
+  buckle.position.z = 0.02;
+  pelvis.add(buckle);
+
+  // Spine & Chest Node
+  const spine = new THREE.Group();
+  spine.position.y = 0.12;
+  pelvis.add(spine);
+
+  // Torso / Voyager Jacket
+  const chestGeom = new THREE.BoxGeometry(0.52, 0.55, 0.34);
+  const chest = new THREE.Mesh(chestGeom, coatMat);
+  chest.position.y = 0.28;
+  chest.castShadow = true;
+  spine.add(chest);
+
+  // Shirt V-neck insert
+  const shirtInsert = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.36), shirtMat);
+  shirtInsert.position.set(0, 0.42, 0.01);
+  spine.add(shirtInsert);
+
+  // Explorer Satchel / Backpack on spine
+  const packGeom = new THREE.BoxGeometry(0.42, 0.46, 0.24);
+  const pack = new THREE.Mesh(packGeom, leatherMat);
+  pack.position.set(0, 0.3, -0.26);
+  pack.castShadow = true;
+  spine.add(pack);
+
+  // Rolled blanket bedroll on top of pack
+  const bedrollGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.48, 8);
   bedrollGeom.rotateZ(Math.PI / 2);
   const bedroll = new THREE.Mesh(bedrollGeom, scarfMat);
-  bedroll.position.set(0, 1.34, -0.25);
-  group.add(bedroll);
+  bedroll.position.set(0, 0.58, -0.26);
+  spine.add(bedroll);
 
-  // Neck & Scarf
-  const scarfGeom = new THREE.TorusGeometry(0.2, 0.08, 6, 12);
-  scarfGeom.rotateX(Math.PI / 2);
-  const scarf = new THREE.Mesh(scarfGeom, scarfMat);
-  scarf.position.y = 1.4;
-  group.add(scarf);
+  // Red Wool Scarf around neck
+  const scarfRing = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.08, 6, 12), scarfMat);
+  scarfRing.rotateX(Math.PI / 2);
+  scarfRing.position.y = 0.6;
+  spine.add(scarfRing);
 
-  // Head
-  const headGeom = new THREE.SphereGeometry(0.18, 10, 8);
+  // Neck & Head Node
+  const headPivot = new THREE.Group();
+  headPivot.position.y = 0.65;
+  spine.add(headPivot);
+
+  // Sculpted Head & Face
+  const headGeom = new THREE.SphereGeometry(0.19, 10, 8);
+  headGeom.scale(0.85, 1.05, 0.95);
   const head = new THREE.Mesh(headGeom, skinMat);
-  head.position.y = 1.58;
+  head.position.y = 0.16;
   head.castShadow = true;
-  group.add(head);
+  headPivot.add(head);
 
-  // Explorer Hat (Crown + Brim)
-  const hatCrownGeom = new THREE.CylinderGeometry(0.19, 0.2, 0.22, 10);
-  const hatCrown = new THREE.Mesh(hatCrownGeom, hatMat);
-  hatCrown.position.y = 1.74;
-  group.add(hatCrown);
+  // Hair
+  const hairGeom = new THREE.SphereGeometry(0.2, 8, 6);
+  hairGeom.scale(0.9, 0.95, 1.0);
+  const hair = new THREE.Mesh(hairGeom, hairMat);
+  hair.position.set(0, 0.19, -0.02);
+  headPivot.add(hair);
 
-  const hatBrimGeom = new THREE.CylinderGeometry(0.38, 0.38, 0.03, 12);
-  const hatBrim = new THREE.Mesh(hatBrimGeom, hatMat);
-  hatBrim.position.y = 1.66;
-  group.add(hatBrim);
+  // Explorer Brimmed Hat (Crown + Flared Brim + Leather Band)
+  const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.24, 12), hatMat);
+  hatCrown.position.y = 0.34;
+  headPivot.add(hatCrown);
 
-  // Left Arm Joint & Mesh
-  const leftArmPivot = new THREE.Group();
-  leftArmPivot.position.set(-0.35, 1.3, 0);
-  const armGeom = new THREE.BoxGeometry(0.14, 0.55, 0.14);
-  armGeom.translate(0, -0.25, 0);
-  const leftArm = new THREE.Mesh(armGeom, coatMat);
-  leftArm.castShadow = true;
-  leftArmPivot.add(leftArm);
-  group.add(leftArmPivot);
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 14), hatMat);
+  hatBrim.position.y = 0.25;
+  hatBrim.rotation.x = -0.05; // stylish tilt
+  headPivot.add(hatBrim);
 
-  // Right Arm Joint & Mesh
-  const rightArmPivot = new THREE.Group();
-  rightArmPivot.position.set(0.35, 1.3, 0);
-  const rightArm = new THREE.Mesh(armGeom, coatMat);
-  rightArm.castShadow = true;
-  rightArmPivot.add(rightArm);
-  group.add(rightArmPivot);
+  const hatBand = new THREE.Mesh(new THREE.CylinderGeometry(0.202, 0.202, 0.06, 12), leatherMat);
+  hatBand.position.y = 0.28;
+  headPivot.add(hatBand);
 
-  // Left Leg Pivot & Mesh (Thigh + Boot)
-  const leftLegPivot = new THREE.Group();
-  leftLegPivot.position.set(-0.16, 0.75, 0);
-  const thighGeom = new THREE.BoxGeometry(0.18, 0.45, 0.18);
-  thighGeom.translate(0, -0.2, 0);
-  const leftThigh = new THREE.Mesh(thighGeom, pantsMat);
+  // Left Arm Chain (Shoulder -> Upper Arm -> Forearm -> Hand)
+  const leftShoulder = new THREE.Group();
+  leftShoulder.position.set(-0.34, 0.48, 0);
+  spine.add(leftShoulder);
+
+  const leftUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.32, 6), coatMat);
+  leftUpperArm.position.y = -0.16;
+  leftUpperArm.castShadow = true;
+  leftShoulder.add(leftUpperArm);
+
+  const leftElbow = new THREE.Group();
+  leftElbow.position.y = -0.32;
+  leftShoulder.add(leftElbow);
+
+  const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.3, 6), coatMat);
+  leftForearm.position.y = -0.15;
+  leftForearm.castShadow = true;
+  leftElbow.add(leftForearm);
+
+  const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), skinMat);
+  leftHand.position.y = -0.34;
+  leftElbow.add(leftHand);
+
+  // Right Arm Chain (Shoulder -> Upper Arm -> Forearm -> Hand)
+  const rightShoulder = new THREE.Group();
+  rightShoulder.position.set(0.34, 0.48, 0);
+  spine.add(rightShoulder);
+
+  const rightUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.32, 6), coatMat);
+  rightUpperArm.position.y = -0.16;
+  rightUpperArm.castShadow = true;
+  rightShoulder.add(rightUpperArm);
+
+  const rightElbow = new THREE.Group();
+  rightElbow.position.y = -0.32;
+  rightShoulder.add(rightElbow);
+
+  const rightForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.3, 6), coatMat);
+  rightForearm.position.y = -0.15;
+  rightForearm.castShadow = true;
+  rightElbow.add(rightForearm);
+
+  const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), skinMat);
+  rightHand.position.y = -0.34;
+  rightElbow.add(rightHand);
+
+  // Left Leg Chain (Hip -> Thigh -> Knee -> Calf -> Boot)
+  const leftHip = new THREE.Group();
+  leftHip.position.set(-0.16, 0, 0);
+  pelvis.add(leftHip);
+
+  const leftThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.42, 8), pantsMat);
+  leftThigh.position.y = -0.21;
   leftThigh.castShadow = true;
-  leftLegPivot.add(leftThigh);
+  leftHip.add(leftThigh);
 
-  const bootGeom = new THREE.BoxGeometry(0.2, 0.35, 0.28);
-  bootGeom.translate(0, -0.55, 0.04);
-  const leftBoot = new THREE.Mesh(bootGeom, leatherMat);
+  const leftKnee = new THREE.Group();
+  leftKnee.position.y = -0.42;
+  leftHip.add(leftKnee);
+
+  const leftCalf = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.38, 8), pantsMat);
+  leftCalf.position.y = -0.19;
+  leftCalf.castShadow = true;
+  leftKnee.add(leftCalf);
+
+  const leftBoot = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.28), leatherMat);
+  leftBoot.position.set(0, -0.36, 0.05);
   leftBoot.castShadow = true;
-  leftLegPivot.add(leftBoot);
-  group.add(leftLegPivot);
+  leftKnee.add(leftBoot);
 
-  // Right Leg Pivot & Mesh
-  const rightLegPivot = new THREE.Group();
-  rightLegPivot.position.set(0.16, 0.75, 0);
-  const rightThigh = new THREE.Mesh(thighGeom, pantsMat);
+  // Right Leg Chain (Hip -> Thigh -> Knee -> Calf -> Boot)
+  const rightHip = new THREE.Group();
+  rightHip.position.set(0.16, 0, 0);
+  pelvis.add(rightHip);
+
+  const rightThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.42, 8), pantsMat);
+  rightThigh.position.y = -0.21;
   rightThigh.castShadow = true;
-  rightLegPivot.add(rightThigh);
+  rightHip.add(rightThigh);
 
-  const rightBoot = new THREE.Mesh(bootGeom, leatherMat);
+  const rightKnee = new THREE.Group();
+  rightKnee.position.y = -0.42;
+  rightHip.add(rightKnee);
+
+  const rightCalf = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.38, 8), pantsMat);
+  rightCalf.position.y = -0.19;
+  rightCalf.castShadow = true;
+  rightKnee.add(rightCalf);
+
+  const rightBoot = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.28), leatherMat);
+  rightBoot.position.set(0, -0.36, 0.05);
   rightBoot.castShadow = true;
-  rightLegPivot.add(rightBoot);
-  group.add(rightLegPivot);
+  rightKnee.add(rightBoot);
 
-  // Hip Brass Lantern that glows warmly as day transitions into dusk/night
+  // Hip Brass Explorer Lantern
   const lanternPivot = new THREE.Group();
-  lanternPivot.position.set(0.34, 0.85, 0.12);
+  lanternPivot.position.set(0.28, 0.05, 0.16);
 
-  const lanternCaseGeom = new THREE.CylinderGeometry(0.08, 0.1, 0.2, 6);
-  const lanternCase = new THREE.Mesh(lanternCaseGeom, brassMat);
+  const lanternCase = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.22, 6), polishedBrassMat);
   lanternPivot.add(lanternCase);
 
-  const lanternGlowGeom = new THREE.SphereGeometry(0.06, 6, 6);
-  const lanternGlowMat = new THREE.MeshBasicMaterial({ color: '#ffbd59' });
-  const lanternGlow = new THREE.Mesh(lanternGlowGeom, lanternGlowMat);
-  lanternPivot.add(lanternGlow);
+  const lanternBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), new THREE.MeshBasicMaterial({ color: '#ffb347' }));
+  lanternPivot.add(lanternBulb);
 
-  const lanternLight = new THREE.PointLight(0xffae42, 1.8, 8, 1.5);
+  const lanternLight = new THREE.PointLight(0xffaa33, 1.6, 9, 1.4);
   lanternPivot.add(lanternLight);
-  group.add(lanternPivot);
+  pelvis.add(lanternPivot);
 
-  let walkCycle = 0;
+  let cycle = 0;
 
   return {
     group,
     lanternLight,
-    setAnimation: (speed: number, delta: number, isGrounded: boolean) => {
-      if (!isGrounded) {
-        // Jumping / Airborne pose
-        leftLegPivot.rotation.x = THREE.MathUtils.lerp(leftLegPivot.rotation.x, -0.4, 0.2);
-        rightLegPivot.rotation.x = THREE.MathUtils.lerp(rightLegPivot.rotation.x, 0.3, 0.2);
-        leftArmPivot.rotation.x = THREE.MathUtils.lerp(leftArmPivot.rotation.x, 0.6, 0.2);
-        rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, 0.6, 0.2);
-        torso.position.y = 1.08;
+    setAnimation: (speed: number, delta: number, isGrounded: boolean, isSitting: boolean) => {
+      // 1. Sitting Animation Pose
+      if (isSitting) {
+        pelvis.position.y = 0.52; // Lower to bench level
+        leftHip.rotation.x = -Math.PI / 2;
+        rightHip.rotation.x = -Math.PI / 2;
+        leftKnee.rotation.x = Math.PI / 2;
+        rightKnee.rotation.x = Math.PI / 2;
+
+        leftShoulder.rotation.x = -0.4;
+        rightShoulder.rotation.x = -0.4;
+        leftElbow.rotation.x = -0.5;
+        rightElbow.rotation.x = -0.5;
+
+        spine.rotation.x = 0.08;
+        headPivot.rotation.x = -0.05;
         return;
       }
 
-      if (speed > 0.1) {
-        // Walking or running cadence
-        const cadence = speed > 5 ? 12 : 8;
-        walkCycle += delta * cadence;
-        const legAngle = Math.sin(walkCycle) * (speed > 5 ? 0.75 : 0.45);
-        leftLegPivot.rotation.x = legAngle;
-        rightLegPivot.rotation.x = -legAngle;
+      pelvis.position.y = 0.88;
 
-        leftArmPivot.rotation.x = -legAngle * 0.9;
-        rightArmPivot.rotation.x = legAngle * 0.9;
+      // 2. Airborne / Jump Pose
+      if (!isGrounded) {
+        leftHip.rotation.x = THREE.MathUtils.lerp(leftHip.rotation.x, -0.5, 0.2);
+        rightHip.rotation.x = THREE.MathUtils.lerp(rightHip.rotation.x, 0.35, 0.2);
+        leftKnee.rotation.x = THREE.MathUtils.lerp(leftKnee.rotation.x, 0.8, 0.2);
+        rightKnee.rotation.x = THREE.MathUtils.lerp(rightKnee.rotation.x, 0.3, 0.2);
 
-        // Torso natural bobbing
-        torso.position.y = 1.05 + Math.abs(Math.sin(walkCycle * 2)) * 0.05;
-        torso.rotation.y = Math.sin(walkCycle) * 0.06;
+        leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, 0.7, 0.2);
+        rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, 0.7, 0.2);
+        return;
+      }
 
-        // Lantern sway
-        lanternPivot.rotation.z = Math.sin(walkCycle) * 0.2;
+      // 3. Locomotion Kinematics (Walk & Run)
+      if (speed > 0.15) {
+        const isRun = speed > 5.0;
+        const cadence = isRun ? 13 : 8.5;
+        cycle += delta * cadence;
+
+        const maxStride = isRun ? 0.78 : 0.48;
+        const stride = Math.sin(cycle) * maxStride;
+
+        leftHip.rotation.x = stride;
+        rightHip.rotation.x = -stride;
+
+        // Realistic knee bending on back-kick
+        leftKnee.rotation.x = Math.max(0, -stride * 1.2);
+        rightKnee.rotation.x = Math.max(0, stride * 1.2);
+
+        // Counter-arm pump
+        leftShoulder.rotation.x = -stride * 0.95;
+        rightShoulder.rotation.x = stride * 0.95;
+        leftElbow.rotation.x = -0.2 - Math.abs(stride) * 0.4;
+        rightElbow.rotation.x = -0.2 - Math.abs(stride) * 0.4;
+
+        // Torso natural vertical bounce & slight twist
+        spine.position.y = 0.12 + Math.abs(Math.sin(cycle * 2)) * (isRun ? 0.08 : 0.04);
+        spine.rotation.y = Math.sin(cycle) * 0.08;
+        spine.rotation.x = isRun ? 0.14 : 0.04; // forward lean when sprinting
+
+        // Lantern rhythmic sway
+        lanternPivot.rotation.z = Math.sin(cycle) * 0.25;
       } else {
-        // Idle breathing pose
-        walkCycle += delta * 2;
-        leftLegPivot.rotation.x = THREE.MathUtils.lerp(leftLegPivot.rotation.x, 0, 0.15);
-        rightLegPivot.rotation.x = THREE.MathUtils.lerp(rightLegPivot.rotation.x, 0, 0.15);
-        leftArmPivot.rotation.x = THREE.MathUtils.lerp(leftArmPivot.rotation.x, 0, 0.15);
-        rightArmPivot.rotation.x = THREE.MathUtils.lerp(rightArmPivot.rotation.x, 0, 0.15);
-        torso.position.y = 1.05 + Math.sin(walkCycle) * 0.015;
-        torso.rotation.y = 0;
+        // 4. Idle Breathing & Organic Weight Shift
+        cycle += delta * 1.8;
+
+        leftHip.rotation.x = THREE.MathUtils.lerp(leftHip.rotation.x, 0, 0.1);
+        rightHip.rotation.x = THREE.MathUtils.lerp(rightHip.rotation.x, 0, 0.1);
+        leftKnee.rotation.x = THREE.MathUtils.lerp(leftKnee.rotation.x, 0, 0.1);
+        rightKnee.rotation.x = THREE.MathUtils.lerp(rightKnee.rotation.x, 0, 0.1);
+
+        leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, 0.05, 0.1);
+        rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, 0.05, 0.1);
+        leftElbow.rotation.x = THREE.MathUtils.lerp(leftElbow.rotation.x, -0.1, 0.1);
+        rightElbow.rotation.x = THREE.MathUtils.lerp(rightElbow.rotation.x, -0.1, 0.1);
+
+        // Gentle breathing chest expansion
+        spine.position.y = 0.12 + Math.sin(cycle) * 0.015;
+        spine.rotation.x = 0;
+        spine.rotation.y = 0;
+        headPivot.rotation.y = Math.sin(cycle * 0.4) * 0.12; // looking around comfortably
         lanternPivot.rotation.z = 0;
       }
     },
@@ -390,8 +550,7 @@ export function createCharacter(): CharacterModel {
 }
 
 /**
- * 3. Ancient Stone Shrine (Glade Landmark at -18, 8)
- * 4-part composite ancient monolith with floating rune crystal
+ * 3. Ancient Whisper Shrine (Glade Landmark)
  */
 export interface ShrineObject {
   group: THREE.Group;
@@ -403,120 +562,63 @@ export interface ShrineObject {
 export function createAncientShrine(): ShrineObject {
   const group = new THREE.Group();
 
-  // Tiered stone dais base
-  const daisGeom = new THREE.CylinderGeometry(3.5, 4.0, 0.5, 8);
-  const dais = new THREE.Mesh(daisGeom, stoneMat);
-  dais.position.y = 0.25;
+  // Tiered ancient stone dais
+  const dais = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.8, 0.6, 10), stoneMasonryMat);
+  dais.position.y = 0.3;
   dais.receiveShadow = true;
   group.add(dais);
 
-  // Twin ancient standing stones / archway
-  const pillarGeom = new THREE.BoxGeometry(0.8, 3.8, 0.7);
-  const leftPillar = new THREE.Mesh(pillarGeom, stoneMat);
-  leftPillar.position.set(-1.4, 2.1, 0);
-  leftPillar.castShadow = true;
-  group.add(leftPillar);
+  // Twin monolith standing stones
+  const pillarGeom = new THREE.BoxGeometry(0.9, 4.2, 0.8);
+  const p1 = new THREE.Mesh(pillarGeom, stoneMasonryMat);
+  p1.position.set(-1.6, 2.4, 0);
+  p1.castShadow = true;
+  group.add(p1);
 
-  const rightPillar = new THREE.Mesh(pillarGeom, stoneMat);
-  rightPillar.position.set(1.4, 2.1, 0);
-  rightPillar.castShadow = true;
-  group.add(rightPillar);
+  const p2 = new THREE.Mesh(pillarGeom, stoneMasonryMat);
+  p2.position.set(1.6, 2.4, 0);
+  p2.castShadow = true;
+  group.add(p2);
 
-  // Lintel arch cross-stone
-  const lintelGeom = new THREE.BoxGeometry(3.8, 0.7, 0.8);
-  const lintel = new THREE.Mesh(lintelGeom, stoneMat);
-  lintel.position.set(0, 4.2, 0);
+  // Lintel arch
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.8, 0.9), stoneMasonryMat);
+  lintel.position.set(0, 4.7, 0);
   lintel.castShadow = true;
   group.add(lintel);
 
   // Levitating ancient azure crystal
-  const crystalGeom = new THREE.OctahedronGeometry(0.45, 0);
+  const crystalGeom = new THREE.OctahedronGeometry(0.55, 0);
+  crystalGeom.scale(0.8, 1.4, 0.8);
   const crystalMat = new THREE.MeshPhysicalMaterial({
-    color: '#42e3f5',
-    emissive: '#1a7587',
-    emissiveIntensity: 0.8,
+    color: '#38bdf8',
+    emissive: '#0284c7',
+    emissiveIntensity: 0.9,
     roughness: 0.1,
-    metalness: 0.2,
+    metalness: 0.15,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.88,
   });
   const crystal = new THREE.Mesh(crystalGeom, crystalMat);
-  crystal.position.set(0, 2.3, 0);
+  crystal.position.set(0, 2.5, 0);
   group.add(crystal);
 
-  const crystalLight = new THREE.PointLight(0x42e3f5, 1.5, 7);
-  crystalLight.position.set(0, 2.3, 0);
-  group.add(crystalLight);
+  const light = new THREE.PointLight(0x38bdf8, 2.0, 9);
+  light.position.set(0, 2.5, 0);
+  group.add(light);
 
   return {
     group,
     crystal,
-    light: crystalLight,
+    light,
     update: (time: number) => {
-      crystal.rotation.y = time * 0.9;
-      crystal.position.y = 2.3 + Math.sin(time * 2.0) * 0.12;
+      crystal.rotation.y = time * 0.85;
+      crystal.position.y = 2.5 + Math.sin(time * 2.2) * 0.14;
     },
   };
 }
 
 /**
- * 4. Sunset Lookout Perch (Cliff Landmark at -15, -25)
- * Weathered cedar bench + brass telescope overlooking the western sea
- */
-export function createSunsetPerch(): THREE.Group {
-  const group = new THREE.Group();
-
-  // Stone viewing flagstones
-  const flagGeom = new THREE.CylinderGeometry(3.0, 3.2, 0.2, 7);
-  const flagstone = new THREE.Mesh(flagGeom, stoneMat);
-  flagstone.position.y = 0.1;
-  flagstone.receiveShadow = true;
-  group.add(flagstone);
-
-  // Wooden bench (Backrest, seat, armrests, legs)
-  const bench = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 0.6), woodMat);
-  seat.position.y = 0.45;
-  seat.castShadow = true;
-  bench.add(seat);
-
-  const backrest = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.08), woodMat);
-  backrest.position.set(0, 0.75, -0.28);
-  backrest.castShadow = true;
-  bench.add(backrest);
-
-  for (const x of [-0.9, 0.9]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.5), woodMat);
-    leg.position.set(x, 0.22, 0);
-    leg.castShadow = true;
-    bench.add(leg);
-  }
-  bench.position.set(0, 0.1, -0.8);
-  group.add(bench);
-
-  // Brass coastal telescope on tripod
-  const tripod = new THREE.Group();
-  const standGeom = new THREE.CylinderGeometry(0.04, 0.05, 1.1, 6);
-  const stand = new THREE.Mesh(standGeom, brassMat);
-  stand.position.y = 0.55;
-  tripod.add(stand);
-
-  const scopeGeom = new THREE.CylinderGeometry(0.07, 0.11, 0.8, 8);
-  scopeGeom.rotateX(Math.PI / 2);
-  const scope = new THREE.Mesh(scopeGeom, brassMat);
-  scope.position.set(0, 1.15, 0.1);
-  scope.rotation.x = -0.15;
-  tripod.add(scope);
-
-  tripod.position.set(0.9, 0.1, 0.8);
-  group.add(tripod);
-
-  return group;
-}
-
-/**
- * 5. Interactive Lore Pedestal / Journal Discovery Point
- * Monolith with floating parchment scroll and golden aura
+ * 4. Interactive Lore Pedestal / Discovery Point
  */
 export interface LorePedestal {
   group: THREE.Group;
@@ -529,37 +631,29 @@ export interface LorePedestal {
 export function createLorePedestal(id: string): LorePedestal {
   const group = new THREE.Group();
 
-  // Stone plinth
-  const plinthGeom = new THREE.CylinderGeometry(0.35, 0.45, 0.9, 6);
-  const plinth = new THREE.Mesh(plinthGeom, stoneMat);
-  plinth.position.y = 0.45;
+  // Carved stone plinth
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.48, 1.0, 8), stoneMasonryMat);
+  plinth.position.y = 0.5;
   plinth.castShadow = true;
   plinth.receiveShadow = true;
   group.add(plinth);
 
-  // Floating rolled parchment scroll
+  // Floating rolled parchment with golden wax seal
   const scroll = new THREE.Group();
-  const parchmentMat = new THREE.MeshStandardMaterial({
-    color: '#faeed1',
-    roughness: 0.6,
-  });
-  const rollGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 8);
-  rollGeom.rotateZ(Math.PI / 2);
-  const roll = new THREE.Mesh(rollGeom, parchmentMat);
+  const parchmentMat = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.65 });
+  const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.44, 8), parchmentMat);
+  roll.rotateZ(Math.PI / 2);
   scroll.add(roll);
 
-  // Golden ribbon tie
-  const ribbonGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.06, 8);
-  ribbonGeom.rotateZ(Math.PI / 2);
-  const ribbon = new THREE.Mesh(ribbonGeom, brassMat);
+  const ribbon = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.08, 8), polishedBrassMat);
+  ribbon.rotateZ(Math.PI / 2);
   scroll.add(ribbon);
 
-  scroll.position.y = 1.25;
+  scroll.position.y = 1.35;
   group.add(scroll);
 
-  // Soft discovery aura light
-  const auraLight = new THREE.PointLight(0xffd573, 1.2, 5);
-  auraLight.position.y = 1.3;
+  const auraLight = new THREE.PointLight(0xf59e0b, 1.4, 6);
+  auraLight.position.y = 1.4;
   group.add(auraLight);
 
   return {
@@ -568,8 +662,8 @@ export function createLorePedestal(id: string): LorePedestal {
     auraLight,
     id,
     update: (time: number) => {
-      scroll.rotation.y = time * 1.4;
-      scroll.position.y = 1.25 + Math.sin(time * 3.0) * 0.08;
+      scroll.rotation.y = time * 1.5;
+      scroll.position.y = 1.35 + Math.sin(time * 3.2) * 0.09;
     },
   };
 }
